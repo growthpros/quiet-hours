@@ -1,11 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,22 +11,16 @@ import {
   ListChecks,
   MessageSquare,
   Heart,
-  Waves,
   ArrowRight,
 } from "lucide-react";
 import type {
   DelegationTask,
   ChecklistRun,
   CompassionEntry,
-  BurnoutCheckin,
 } from "@shared/schema";
 import { DAILY_THOUGHTS } from "@/lib/quiet-hours-data";
-import {
-  startOfTodayMs,
-  summarize,
-  bandFor,
-  markerPercent,
-} from "@/lib/burnout-utils";
+import { FoundationCard } from "@/components/foundation-card";
+import { BurnoutWave } from "@/components/burnout-wave";
 
 function dayOfYear(): number {
   const now = new Date();
@@ -158,20 +149,8 @@ export default function Today() {
   const compassion = useQuery<CompassionEntry[]>({
     queryKey: ["/api/compassion"],
   });
-  const todayStart = startOfTodayMs();
-  const burnout = useQuery<BurnoutCheckin[]>({
-    queryKey: ["/api/burnout", "today"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", `/api/burnout?since=${todayStart}`);
-      return res.json();
-    },
-  });
   const streaks = useQuery<Streaks>({
     queryKey: ["/api/burnout/streaks"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/burnout/streaks");
-      return res.json();
-    },
   });
 
   const openTasks =
@@ -182,12 +161,6 @@ export default function Today() {
   const compassionCount = compassion.data?.length ?? 0;
 
   const thought = DAILY_THOUGHTS[dayOfYear() % DAILY_THOUGHTS.length];
-
-  const burnoutSummary = burnout.data ? summarize(burnout.data) : null;
-  const hasCheckins = (burnout.data?.length ?? 0) > 0;
-  const band = burnoutSummary
-    ? bandFor(burnoutSummary.avgIntensity)
-    : null;
 
   // Gentle nudge: pick the strongest non-grounded streak (≥ 3 days).
   // Numbing is prioritized because it maps most directly to the
@@ -214,10 +187,16 @@ export default function Today() {
         <p className="max-w-3xl text-base leading-relaxed text-muted-foreground">
           This is a workplace toolkit for the parts of you that try to do
           everything, do it perfectly, and do it personally. Today, you only
-          need to do this: notice the urge, name it, and choose differently
-          — once.
+          need to do this: notice the urge, name it, and choose differently,
+          once.
         </p>
       </header>
+
+      {/* ---------- Burnout Wave (top of Today) ---------- */}
+      <BurnoutWave />
+
+      {/* ---------- Foundation (Bottom of the Pyramid) ---------- */}
+      <FoundationCard />
 
       {/* ---------- Four cross-link cards ---------- */}
       <div className="grid gap-4 md:grid-cols-2">
@@ -293,77 +272,6 @@ export default function Today() {
           </CardContent>
         </Card>
       )}
-
-      {/* ---------- Burnout check card ---------- */}
-      <Card data-testid="card-today-burnout">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-[11px] font-normal uppercase tracking-[0.14em] text-muted-foreground">
-            <Waves className="h-3.5 w-3.5" strokeWidth={1.5} />
-            Today's burnout check
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {burnout.isLoading ? (
-            <Skeleton className="h-16 w-full" />
-          ) : !hasCheckins ? (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="font-serif italic text-muted-foreground">
-                You haven't paused yet today.
-              </p>
-              <Link href="/burnout">
-                <Button data-testid="button-do-checkin">
-                  Do a 5-min check-in
-                </Button>
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-baseline justify-between gap-3">
-                <div>
-                  <span
-                    className="font-serif text-lg font-medium text-foreground"
-                    data-testid="text-today-band-label"
-                  >
-                    {band!.label}
-                  </span>
-                  <span className="ml-2 text-sm text-muted-foreground">
-                    · today so far
-                  </span>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {burnoutSummary!.count}{" "}
-                  {burnoutSummary!.count === 1 ? "check-in" : "check-ins"}
-                </span>
-              </div>
-              <div className="relative">
-                <div className="h-2.5 w-full rounded-full bg-gradient-to-r from-primary via-chart-3 to-destructive opacity-80" />
-                <div
-                  className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-foreground shadow"
-                  style={{
-                    left: `${markerPercent(burnoutSummary!.avgIntensity)}%`,
-                  }}
-                  data-testid="marker-today-band"
-                />
-                <div className="mt-1.5 flex justify-between text-[10px] text-muted-foreground">
-                  <span>Restored</span>
-                  <span>Overloaded</span>
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <Link href="/burnout">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    data-testid="button-do-checkin"
-                  >
-                    Do another check-in
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       {/* ---------- One thought for today ---------- */}
       <section className="space-y-3" data-testid="section-daily-thought">
