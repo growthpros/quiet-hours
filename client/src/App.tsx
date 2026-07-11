@@ -15,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import NotFound from "@/pages/not-found";
 import SignIn from "@/pages/sign-in";
 import Today from "@/pages/today";
+import Foundation from "@/pages/foundation";
 import Delegation from "@/pages/delegation";
 import GoodEnough from "@/pages/good-enough";
 import Reframes from "@/pages/reframes";
@@ -27,6 +28,7 @@ function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={Today} />
+      <Route path="/foundation" component={Foundation} />
       <Route path="/delegation" component={Delegation} />
       <Route path="/good-enough" component={GoodEnough} />
       <Route path="/reframes" component={Reframes} />
