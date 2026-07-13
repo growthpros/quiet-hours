@@ -122,24 +122,44 @@ function bodyCountFrom(symptomsJson: string | null): number {
 
 // ---------- Ledger ----------
 export async function getOrCreateTodayLedger(): Promise<SpoonLedgerRow> {
+  return getOrCreateLedgerForDate(todayLocalDateString());
+}
+
+export async function getOrCreateLedgerForDate(ymd: string): Promise<SpoonLedgerRow> {
   const user_id = await requireUserId();
-  const today = todayLocalDateString();
 
   const { data: existing, error: readErr } = await supabase
     .from("spoon_ledger")
     .select("*")
     .eq("user_id", user_id)
-    .eq("log_date", today)
+    .eq("log_date", ymd)
     .maybeSingle();
   if (readErr) throw readErr;
   if (existing) return existing as SpoonLedgerRow;
+
+  // For past days, don't insert an empty row. Return a synthetic empty ledger
+  // so read-only past-day view doesn't clutter the DB with zero rows.
+  const today = todayLocalDateString();
+  if (ymd !== today) {
+    return {
+      id: -1,
+      user_id,
+      log_date: ymd,
+      allotted: 0,
+      committed: 0,
+      spent: 0,
+      earned_back: 0,
+      created_at: 0,
+      updated_at: 0,
+    };
+  }
 
   const now = Date.now();
   const { data: created, error: writeErr } = await supabase
     .from("spoon_ledger")
     .insert({
       user_id,
-      log_date: today,
+      log_date: ymd,
       allotted: 0,
       committed: 0,
       spent: 0,
@@ -294,11 +314,14 @@ export async function deleteEarnBackAction(id: number): Promise<void> {
 
 // ---------- Earn-back events ----------
 export async function listTodayEarnBackEvents(): Promise<EarnBackEventRow[]> {
-  const today = todayLocalDateString();
+  return listEarnBackEventsForDate(todayLocalDateString());
+}
+
+export async function listEarnBackEventsForDate(ymd: string): Promise<EarnBackEventRow[]> {
   const { data, error } = await supabase
     .from("earn_back_events")
     .select("*")
-    .eq("log_date", today)
+    .eq("log_date", ymd)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as EarnBackEventRow[];

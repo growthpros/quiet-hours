@@ -13,6 +13,12 @@ import type { BurnoutCheckin } from "@shared/schema";
 import { startOfTodayMs, bandFor, formatTime } from "@/lib/burnout-utils";
 import { apiRequest } from "@/lib/queryClient";
 import { generateWaveMessage } from "@/lib/wave-message";
+import {
+  useViewingDate,
+  humanLabel,
+  startOfDayMs,
+  endOfDayMs,
+} from "@/lib/viewing-date";
 
 // Palette (kept inline; matches FoundationCard tokens).
 const COLORS = {
@@ -100,12 +106,18 @@ function chipColorsFor(intensity: number): { bg: string; text: string; dot: stri
 }
 
 export function BurnoutWave() {
-  const todayStart = startOfTodayMs();
+  const { date, isToday } = useViewingDate();
+  const since = isToday ? startOfTodayMs() : startOfDayMs(date);
+  const until = isToday ? Date.now() : endOfDayMs(date);
+
   const burnout = useQuery<BurnoutCheckin[]>({
-    queryKey: ["/api/burnout", "today"],
+    queryKey: ["/api/burnout", "wave", date],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/burnout?since=${todayStart}`);
-      return res.json();
+      // Fetch the day's window. For historic days, filter by both since AND
+      // an upper bound so we don't pull the whole future.
+      const res = await apiRequest("GET", `/api/burnout?since=${since}`);
+      const all = (await res.json()) as BurnoutCheckin[];
+      return all.filter((c) => c.createdAt >= since && c.createdAt <= until);
     },
   });
 
@@ -147,7 +159,7 @@ export function BurnoutWave() {
               style={{ color: COLORS.inkSoft }}
             >
               <Waves className="h-3.5 w-3.5" strokeWidth={2} />
-              Today's Burnout Wave
+              {isToday ? "Today's Burnout Wave" : `Burnout Wave, ${humanLabel(date).toLowerCase()}`}
             </p>
             <p
               className="font-serif italic text-sm mt-1"

@@ -243,11 +243,14 @@ export async function deletePillar(id: number): Promise<void> {
 
 // ---------- Daily logs ----------
 export async function listTodayLogs(): Promise<DailyFoundationLogRow[]> {
-  const today = todayLocalDateString();
+  return listLogsForDate(todayLocalDateString());
+}
+
+export async function listLogsForDate(ymd: string): Promise<DailyFoundationLogRow[]> {
   const { data, error } = await supabase
     .from("daily_foundation_logs")
     .select("*")
-    .eq("log_date", today);
+    .eq("log_date", ymd);
   if (error) throw error;
   return (data ?? []) as DailyFoundationLogRow[];
 }

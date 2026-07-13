@@ -14,8 +14,10 @@ import { toast } from "@/hooks/use-toast";
 import { Utensils, MoreHorizontal } from "lucide-react";
 import {
   getOrCreateTodayLedger,
+  getOrCreateLedgerForDate,
   listEarnBackActions,
   listTodayEarnBackEvents,
+  listEarnBackEventsForDate,
   logEarnBack,
   seedDefaultEarnBackIfNeeded,
   undoEarnBack,
@@ -23,6 +25,7 @@ import {
   type EarnBackEventRow,
   type SpoonLedgerRow,
 } from "@/lib/spoon-data";
+import { useViewingDate, humanLabel } from "@/lib/viewing-date";
 
 const C = {
   cream: "#FBF7F0",
@@ -51,12 +54,13 @@ function fmt(n: number): string {
 export function SpoonMeter() {
   const qc = useQueryClient();
   const [showEarnPanel, setShowEarnPanel] = useState(false);
+  const { date, isToday } = useViewingDate();
 
   const ledgerQ = useQuery<SpoonLedgerRow>({
-    queryKey: ["/api/spoon/ledger", "today"],
+    queryKey: ["/api/spoon/ledger", date],
     queryFn: async () => {
-      await seedDefaultEarnBackIfNeeded();
-      return getOrCreateTodayLedger();
+      if (isToday) await seedDefaultEarnBackIfNeeded();
+      return getOrCreateLedgerForDate(date);
     },
   });
 
@@ -66,23 +70,21 @@ export function SpoonMeter() {
   });
 
   const eventsQ = useQuery<EarnBackEventRow[]>({
-    queryKey: ["/api/earn-back/events", "today"],
-    queryFn: listTodayEarnBackEvents,
+    queryKey: ["/api/earn-back/events", date],
+    queryFn: () => listEarnBackEventsForDate(date),
   });
 
   const log = useMutation({
     mutationFn: async (action: EarnBackActionRow) => {
-      // No duration prompt on chip tap; caller is asserting the qualifying
-      // duration happened. For duration-min actions, we still pass the minimum
-      // so the check passes.
+      if (!isToday) throw new Error("Past days are read-only.");
       return logEarnBack({
         action,
         durationMinutes: action.duration_min_minutes ?? null,
       });
     },
     onSuccess: (result, action) => {
-      qc.invalidateQueries({ queryKey: ["/api/spoon/ledger", "today"] });
-      qc.invalidateQueries({ queryKey: ["/api/earn-back/events", "today"] });
+      qc.invalidateQueries({ queryKey: ["/api/spoon/ledger", date] });
+      qc.invalidateQueries({ queryKey: ["/api/earn-back/events", date] });
       if (result.event.at_cap) {
         toast({
           title: `${action.label}, logged.`,
@@ -101,10 +103,13 @@ export function SpoonMeter() {
   });
 
   const undo = useMutation({
-    mutationFn: async (eventId: number) => undoEarnBack(eventId),
+    mutationFn: async (eventId: number) => {
+      if (!isToday) throw new Error("Past days are read-only.");
+      return undoEarnBack(eventId);
+    },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/spoon/ledger", "today"] });
-      qc.invalidateQueries({ queryKey: ["/api/earn-back/events", "today"] });
+      qc.invalidateQueries({ queryKey: ["/api/spoon/ledger", date] });
+      qc.invalidateQueries({ queryKey: ["/api/earn-back/events", date] });
       toast({ title: "Earn-back removed." });
     },
   });
@@ -147,18 +152,20 @@ export function SpoonMeter() {
                 style={{ color: C.inkSoft }}
               >
                 <Utensils className="h-3.5 w-3.5" strokeWidth={2} />
-                Today's Spoons
+                {isToday ? "Today's Spoons" : `Spoons, ${humanLabel(date).toLowerCase()}`}
               </p>
               <p
                 className="font-serif italic text-sm mt-1"
                 style={{ color: C.inkMute }}
               >
                 {noAllotment
-                  ? "Do a morning check-in to see today's allotment."
-                  : "How much energy you have, and how much of it is spoken for."}
+                  ? isToday
+                    ? "Do a morning check-in to see today's allotment."
+                    : "No allotment was issued this day. It happens when you skip the morning check-in."
+                  : "How much energy you had, and how much was spoken for."}
               </p>
             </div>
-            {noAllotment && (
+            {noAllotment && isToday && (
               <Link href="/burnout">
                 <Button size="sm" data-testid="button-checkin-for-spoons">
                   Do morning check-in
@@ -260,7 +267,7 @@ export function SpoonMeter() {
           <div className="px-6 py-4 border-t" style={{ borderColor: C.line }}>
             <Skeleton className="h-10 w-full rounded-full" />
           </div>
-        ) : featured.length > 0 ? (
+        ) : featured.length > 0 && isToday ? (
           <div className="px-6 py-4 border-t" style={{ borderColor: C.line }}>
             <p
               className="text-[10px] uppercase tracking-[0.14em] font-bold mb-2"

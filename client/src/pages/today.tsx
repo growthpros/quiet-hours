@@ -206,6 +206,9 @@ export default function Today() {
       {/* ---------- Foundation (Bottom of the Pyramid) ---------- */}
       <FoundationCard />
 
+      {/* ---------- Everything below only shows on today ---------- */}
+      {isToday && (
+        <>
       {/* ---------- Four cross-link cards ---------- */}
       <div className="grid gap-4 md:grid-cols-2">
         <CrossCard
@@ -313,6 +316,8 @@ export default function Today() {
           </CardContent>
         </Card>
       </section>
+        </>
+      )}
     </div>
   );
 }

@@ -16,6 +16,7 @@ import { Plus, Check } from "lucide-react";
 import {
   listPillars,
   listTodayLogs,
+  listLogsForDate,
   upsertTodayLog,
   seedDefaultPillarsIfNeeded,
   getOrCreateProfile,
@@ -23,6 +24,7 @@ import {
   type DailyFoundationLogRow,
   type UserProfileRow,
 } from "@/lib/foundation-data";
+import { useViewingDate, humanLabel } from "@/lib/viewing-date";
 import { DEFAULT_SYMPTOM_CHIPS } from "@/lib/foundation-defaults";
 import {
   listEarnBackActions,
@@ -345,11 +347,12 @@ function LogModal({ pillar, currentLog, open, onClose }: LogModalProps) {
 export function FoundationCard() {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<FoundationPillarRow | null>(null);
+  const { date, isToday } = useViewingDate();
 
   const profileQ = useQuery<UserProfileRow>({
     queryKey: ["/api/profile"],
     queryFn: async () => {
-      await seedDefaultPillarsIfNeeded();
+      if (isToday) await seedDefaultPillarsIfNeeded();
       return getOrCreateProfile();
     },
   });
@@ -361,8 +364,8 @@ export function FoundationCard() {
   });
 
   const logsQ = useQuery<DailyFoundationLogRow[]>({
-    queryKey: ["/api/foundation/logs", "today"],
-    queryFn: listTodayLogs,
+    queryKey: ["/api/foundation/logs", date],
+    queryFn: () => listLogsForDate(date),
     enabled: profileQ.data !== undefined,
   });
 
@@ -399,10 +402,12 @@ export function FoundationCard() {
           <div className="flex items-baseline justify-between mb-4">
             <div>
               <p className="font-serif text-lg font-medium text-[#2A2620]">
-                Bottom of the Pyramid
+                {isToday ? "Bottom of the Pyramid" : `Foundation, ${humanLabel(date).toLowerCase()}`}
               </p>
               <p className="font-serif italic text-sm text-[#58524A] mt-0.5">
-                The base has to be steady before anything else.
+                {isToday
+                  ? "The base has to be steady before anything else."
+                  : "What your foundation looked like that day."}
               </p>
             </div>
             <Link href="/foundation">
@@ -445,13 +450,20 @@ export function FoundationCard() {
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => setSelected(p)}
-                    className="rounded-xl px-2 py-3 text-center transition-transform hover:-translate-y-0.5"
+                    onClick={() => {
+                      if (isToday) setSelected(p);
+                    }}
+                    disabled={!isToday}
+                    className={
+                      "rounded-xl px-2 py-3 text-center transition-transform " +
+                      (isToday ? "hover:-translate-y-0.5" : "cursor-default")
+                    }
                     style={{
                       background: "rgba(255,255,255,0.75)",
                       border: met
                         ? "1px solid rgba(143, 160, 90, 0.5)"
                         : "1px solid transparent",
+                      opacity: isToday ? 1 : 0.9,
                     }}
                     data-testid={`pillar-${p.pillar_key}`}
                   >
@@ -473,28 +485,30 @@ export function FoundationCard() {
                   </button>
                 );
               })}
-              <Link href="/foundation">
-                <button
-                  type="button"
-                  className="flex flex-col items-center justify-center rounded-xl px-2 py-3 h-full min-h-[76px] transition-colors hover:bg-white/40"
-                  style={{
-                    border: "1.5px dashed rgba(216, 155, 122, 0.5)",
-                    color: "#58524A",
-                  }}
-                  data-testid="button-add-pillar"
-                >
-                  <Plus className="h-5 w-5 mb-1" strokeWidth={1.5} />
-                  <span className="text-[10px] uppercase tracking-wider font-semibold">
-                    Add pillar
-                  </span>
-                </button>
-              </Link>
+              {isToday && (
+                <Link href="/foundation">
+                  <button
+                    type="button"
+                    className="flex flex-col items-center justify-center rounded-xl px-2 py-3 h-full min-h-[76px] transition-colors hover:bg-white/40"
+                    style={{
+                      border: "1.5px dashed rgba(216, 155, 122, 0.5)",
+                      color: "#58524A",
+                    }}
+                    data-testid="button-add-pillar"
+                  >
+                    <Plus className="h-5 w-5 mb-1" strokeWidth={1.5} />
+                    <span className="text-[10px] uppercase tracking-wider font-semibold">
+                      Add pillar
+                    </span>
+                  </button>
+                </Link>
+              )}
             </div>
           )}
         </div>
       </Card>
 
-      {selected && (
+      {selected && isToday && (
         <LogModal
           pillar={selected}
           currentLog={logsByPillar.get(selected.id)}
