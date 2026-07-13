@@ -21,6 +21,8 @@ import type {
 import { DAILY_THOUGHTS } from "@/lib/quiet-hours-data";
 import { FoundationCard } from "@/components/foundation-card";
 import { BurnoutWave } from "@/components/burnout-wave";
+import { SpoonMeter } from "@/components/spoon-meter";
+import { PhaseSuggestionBanner } from "@/components/phase-suggestion";
 
 function dayOfYear(): number {
   const now = new Date();
@@ -192,7 +194,13 @@ export default function Today() {
         </p>
       </header>
 
-      {/* ---------- Burnout Wave (top of Today) ---------- */}
+      {/* ---------- Spoon meter (persistent) ---------- */}
+      <SpoonMeter />
+
+      {/* ---------- Phase-shift suggestion (only when the pattern warrants) ---------- */}
+      <PhaseSuggestionBanner />
+
+      {/* ---------- Burnout Wave ---------- */}
       <BurnoutWave />
 
       {/* ---------- Foundation (Bottom of the Pyramid) ---------- */}

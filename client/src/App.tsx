@@ -16,6 +16,7 @@ import NotFound from "@/pages/not-found";
 import SignIn from "@/pages/sign-in";
 import Today from "@/pages/today";
 import Foundation from "@/pages/foundation";
+import EarnBack from "@/pages/earn-back";
 import Delegation from "@/pages/delegation";
 import GoodEnough from "@/pages/good-enough";
 import Reframes from "@/pages/reframes";
@@ -29,6 +30,7 @@ function AppRouter() {
     <Switch>
       <Route path="/" component={Today} />
       <Route path="/foundation" component={Foundation} />
+      <Route path="/earn-back" component={EarnBack} />
       <Route path="/delegation" component={Delegation} />
       <Route path="/good-enough" component={GoodEnough} />
       <Route path="/reframes" component={Reframes} />
