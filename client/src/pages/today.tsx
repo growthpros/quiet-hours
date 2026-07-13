@@ -23,6 +23,8 @@ import { FoundationCard } from "@/components/foundation-card";
 import { BurnoutWave } from "@/components/burnout-wave";
 import { SpoonMeter } from "@/components/spoon-meter";
 import { PhaseSuggestionBanner } from "@/components/phase-suggestion";
+import { DayNavigator, ViewingHistoryRibbon } from "@/components/day-navigator";
+import { ViewingDateProvider, useViewingDate } from "@/lib/viewing-date";
 
 function dayOfYear(): number {
   const now = new Date();
