@@ -41,6 +41,8 @@ import {
   SYMPTOM_OPTIONS,
   formatTime,
 } from "@/lib/burnout-utils";
+import { ChipMultiSelect } from "@/components/chip-multiselect";
+import { PULL_OPTIONS } from "@/lib/burnout-options-const";
 
 const ENERGY_SCALE = [
   { v: 1, label: "Depleted" },
@@ -118,15 +120,6 @@ const STATE_OPTIONS: StateOption[] = [
   },
 ];
 
-const PULL_OPTIONS = [
-  { id: "phone", label: "Phone / apps" },
-  { id: "news", label: "News / feeds" },
-  { id: "side-project", label: "A side project" },
-  { id: "other-work", label: "Work that isn't today's work" },
-  { id: "scrolling", label: "Scrolling" },
-  { id: "replaying", label: "Replaying something" },
-  { id: "other", label: "Something else" },
-];
 
 function stateLabel(id: string | null | undefined): string {
   if (!id) return "—";
@@ -360,23 +353,14 @@ function CheckinCard() {
                 <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
                   What pulled you (optional)
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {PULL_OPTIONS.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => togglePull(p.id)}
-                      className={cn(
-                        "rounded-full border px-3 py-1 text-xs hover-elevate",
-                        pulls.includes(p.id)
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border text-muted-foreground",
-                      )}
-                      data-testid={`chip-pull-${p.id}`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
+                <ChipMultiSelect
+                  curated={PULL_OPTIONS}
+                  category="pull"
+                  selected={pulls}
+                  onChange={setPulls}
+                  compact
+                  testIdPrefix="chip-pull"
+                />
               </div>
             )}
 
@@ -406,23 +390,13 @@ function CheckinCard() {
                 All optional. Tap whatever's true.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {SYMPTOM_OPTIONS.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => toggleSymptom(s.id)}
-                  className={cn(
-                    "rounded-full border px-3 py-1.5 text-sm hover-elevate",
-                    symptoms.includes(s.id)
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border text-muted-foreground",
-                  )}
-                  data-testid={`chip-symptom-${s.id}`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
+            <ChipMultiSelect
+              curated={SYMPTOM_OPTIONS}
+              category="body"
+              selected={symptoms}
+              onChange={setSymptoms}
+              testIdPrefix="chip-symptom"
+            />
           </div>
         )}
 

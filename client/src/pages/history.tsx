@@ -24,23 +24,34 @@ import {
   Waves,
   HeartHandshake,
 } from "lucide-react";
+import { HistoryCharts } from "@/components/history-charts";
 
 // ---------- Date-range filter ----------
-type Range = "7d" | "30d" | "90d" | "all";
+type Range = "7d" | "14d" | "30d" | "90d" | "365d" | "all";
 
 const RANGE_LABELS: Record<Range, string> = {
   "7d": "Last 7 days",
+  "14d": "Last 14 days",
   "30d": "Last 30 days",
-  "90d": "Last 90 days",
+  "90d": "Last quarter",
+  "365d": "Last year",
   all: "All time",
+};
+
+const RANGE_DAYS: Record<Range, number> = {
+  "7d": 7,
+  "14d": 14,
+  "30d": 30,
+  "90d": 90,
+  "365d": 365,
+  all: 3650, // effectively 10y for the charts' granularity logic
 };
 
 function rangeStartMs(r: Range): number {
   if (r === "all") return 0;
   const d = new Date();
   d.setHours(0, 0, 0, 0);
-  const days = r === "7d" ? 7 : r === "30d" ? 30 : 90;
-  d.setDate(d.getDate() - days + 1);
+  d.setDate(d.getDate() - RANGE_DAYS[r] + 1);
   return d.getTime();
 }
 
@@ -135,7 +146,7 @@ type CompassionRow = CompassionEntryRow & {
 // History page
 // ============================================================================
 export default function History() {
-  const [range, setRange] = useState<Range>("30d");
+  const [range, setRange] = useState<Range>("7d");
   const since = rangeStartMs(range);
 
   const burnout = useQuery<BurnoutRow[]>({ queryKey: ["/api/burnout"] });
@@ -191,6 +202,14 @@ export default function History() {
         <EmptyState range={range} />
       ) : (
         <>
+          <HistoryCharts
+            checkins={b.map((r) => ({ ...(r as unknown as BurnoutCheckinRow), created_at: r.createdAt }))}
+            delegation={d.map((r) => ({ ...(r as unknown as DelegationTaskRow), created_at: r.createdAt }))}
+            checklists={cl.map((r) => ({ ...(r as unknown as ChecklistRunRow), created_at: r.createdAt }))}
+            compassion={co.map((r) => ({ ...(r as unknown as CompassionEntryRow), created_at: r.createdAt }))}
+            rangeDays={RANGE_DAYS[range]}
+            rangeLabel={RANGE_LABELS[range]}
+          />
           <ReflectionMirror
             burnout={b}
             delegation={d}
