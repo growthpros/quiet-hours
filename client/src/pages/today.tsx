@@ -170,40 +170,67 @@ export default function Today() {
   const nudge = pickNudge(streaks.data);
 
   return (
-    <div className="space-y-12">
-      {/* ---------- Header ---------- */}
-      <header className="space-y-4">
-        <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-          {new Date().toLocaleDateString([], {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          })}
-        </p>
-        <h1
-          className="font-serif text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
-          data-testid="text-hero-title"
-        >
-          Begin the day a little gentler than yesterday.
-        </h1>
-        <p className="max-w-3xl text-base leading-relaxed text-muted-foreground">
-          This is a workplace toolkit for the parts of you that try to do
-          everything, do it perfectly, and do it personally. Today, you only
-          need to do this: notice the urge, name it, and choose differently,
-          once.
-        </p>
-      </header>
+    <ViewingDateProvider>
+      <TodayInner
+        nudge={nudge}
+        thought={thought}
+        openTasks={openTasks}
+        activeRuns={activeRuns}
+        scriptCount={scriptCount}
+        compassionCount={compassionCount}
+      />
+    </ViewingDateProvider>
+  );
+}
 
-      {/* ---------- Spoon meter (persistent) ---------- */}
+interface TodayInnerProps {
+  nudge: Nudge | null;
+  thought: string;
+  openTasks: number;
+  activeRuns: number;
+  scriptCount: number;
+  compassionCount: number;
+}
+
+function TodayInner({ nudge, thought, openTasks, activeRuns, scriptCount, compassionCount }: TodayInnerProps) {
+  const { isToday } = useViewingDate();
+
+  return (
+    <div className="space-y-12">
+      {/* ---------- Day navigator (previous / next / back to today) ---------- */}
+      <DayNavigator />
+
+      {/* ---------- Viewing-history ribbon (only visible off-today) ---------- */}
+      <ViewingHistoryRibbon />
+
+      {/* ---------- Header (today only) ---------- */}
+      {isToday && (
+        <header className="space-y-4">
+          <h1
+            className="font-serif text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
+            data-testid="text-hero-title"
+          >
+            Begin the day a little gentler than yesterday.
+          </h1>
+          <p className="max-w-3xl text-base leading-relaxed text-muted-foreground">
+            This is a workplace toolkit for the parts of you that try to do
+            everything, do it perfectly, and do it personally. Today, you only
+            need to do this: notice the urge, name it, and choose differently,
+            once.
+          </p>
+        </header>
+      )}
+
+      {/* ---------- Spoon meter (persistent, date-aware) ---------- */}
       <SpoonMeter />
 
-      {/* ---------- Phase-shift suggestion (only when the pattern warrants) ---------- */}
-      <PhaseSuggestionBanner />
+      {/* ---------- Phase-shift suggestion (today only) ---------- */}
+      {isToday && <PhaseSuggestionBanner />}
 
-      {/* ---------- Burnout Wave ---------- */}
+      {/* ---------- Burnout Wave (date-aware) ---------- */}
       <BurnoutWave />
 
-      {/* ---------- Foundation (Bottom of the Pyramid) ---------- */}
+      {/* ---------- Foundation (Bottom of the Pyramid, date-aware) ---------- */}
       <FoundationCard />
 
       {/* ---------- Everything below only shows on today ---------- */}
