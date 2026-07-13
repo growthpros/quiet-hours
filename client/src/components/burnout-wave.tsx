@@ -1,10 +1,7 @@
 // The Burnout Wave.
-// A ribbon at the top of Today that shows every check-in the user has
-// logged so far today, positioned by time on the x-axis and by state
-// intensity on the y-axis. The line curves between dots to reveal the
-// arc of the day. Current check-in gets a soft pulsing ring.
-//
-// Falls back to a warm empty state when there are no check-ins yet.
+// A ribbon at the top of Today that plots every check-in the user has logged
+// so far today, positioned by time on the x-axis and by state intensity on
+// the y-axis. Includes a warm regulation message tuned to today's pattern.
 
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -15,30 +12,40 @@ import { Waves } from "lucide-react";
 import type { BurnoutCheckin } from "@shared/schema";
 import { startOfTodayMs, bandFor, formatTime } from "@/lib/burnout-utils";
 import { apiRequest } from "@/lib/queryClient";
+import { generateWaveMessage } from "@/lib/wave-message";
 
-// Palette (also used in the FoundationCard). Kept inline to avoid
-// touching global Tailwind config in this session.
+// Palette (kept inline; matches FoundationCard tokens).
 const COLORS = {
   moss: "#8FA05A",
+  mossSoft: "#DFE5C9",
   sage: "#7A9B7E",
+  sageSoft: "#D4E0D3",
   amber: "#D9A55E",
+  amberSoft: "#F2E1C5",
   terracotta: "#D89B7A",
+  terracottaSoft: "#F0D9C7",
   ink: "#2A2620",
-  inkSoft: "#58524A",
-  inkMute: "#8A8378",
-  line: "#E5DDCC",
-  bandLine: "#E5DDCC",
+  inkDeep: "#1F1D1A",
+  inkSoft: "#3D3A34",
+  inkMute: "#6D655A",
+  line: "#C8BFA9",
+  lineSoft: "#DFD5BF",
 };
 
-// Map an intensity value (1..5) to a y coordinate in the 130-tall viewbox.
-// intensity 1 (restored)  -> y ~ 12
-// intensity 5 (overloaded)-> y ~ 118
+// Bands, top to bottom
+const BANDS = [
+  { key: "restored", label: "Restored", tint: "rgba(143, 160, 90, 0.09)", accent: COLORS.moss },
+  { key: "steady", label: "Steady", tint: "rgba(122, 155, 126, 0.09)", accent: COLORS.sage },
+  { key: "stretched", label: "Stretched", tint: "rgba(217, 165, 94, 0.10)", accent: COLORS.amber },
+  { key: "overloaded", label: "Overloaded", tint: "rgba(216, 155, 122, 0.12)", accent: COLORS.terracotta },
+] as const;
+
+// Map intensity 1..5 to y coordinate on 130-tall viewbox.
 function yFor(intensity: number, height = 130): number {
   const clamped = Math.max(1, Math.min(5, intensity));
   return 12 + ((clamped - 1) / 4) * (height - 24);
 }
 
-// Dot color by band
 function dotColorFor(intensity: number): string {
   if (intensity < 2) return COLORS.moss;
   if (intensity < 3) return COLORS.sage;
@@ -46,11 +53,9 @@ function dotColorFor(intensity: number): string {
   return COLORS.terracotta;
 }
 
-// Time of day -> x coordinate. Anchors at 6am (x=60) through midnight (x=940).
 function xFor(ms: number, width = 1000): number {
   const d = new Date(ms);
   const hour = d.getHours() + d.getMinutes() / 60;
-  // Compress into visible span 6am..midnight
   const start = 6;
   const end = 24;
   const clamped = Math.max(start, Math.min(end, hour));
@@ -68,11 +73,9 @@ interface Point {
   note: string | null;
 }
 
-// Curved path (Catmull-Rom to Bezier approximation) for smooth line.
 function curvedPath(points: Point[]): string {
   if (points.length === 0) return "";
   if (points.length === 1) return `M ${points[0].x},${points[0].y}`;
-
   const parts: string[] = [`M ${points[0].x},${points[0].y}`];
   for (let i = 0; i < points.length - 1; i++) {
     const p0 = points[i - 1] ?? points[i];
@@ -86,6 +89,14 @@ function curvedPath(points: Point[]): string {
     parts.push(`C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`);
   }
   return parts.join(" ");
+}
+
+// Semantic accent color for the current band label chip
+function chipColorsFor(intensity: number): { bg: string; text: string; dot: string } {
+  if (intensity < 2) return { bg: COLORS.mossSoft, text: "#4A5A2A", dot: COLORS.moss };
+  if (intensity < 3) return { bg: COLORS.sageSoft, text: "#3F5A44", dot: COLORS.sage };
+  if (intensity < 4) return { bg: COLORS.amberSoft, text: "#7A521A", dot: COLORS.amber };
+  return { bg: COLORS.terracottaSoft, text: "#8A3E22", dot: COLORS.terracotta };
 }
 
 export function BurnoutWave() {
@@ -102,6 +113,8 @@ export function BurnoutWave() {
   const hasCheckins = checkins.length > 0;
   const latest = hasCheckins ? checkins[checkins.length - 1] : null;
   const latestBand = latest ? bandFor(latest.intensity) : null;
+  const chip = latest ? chipColorsFor(latest.intensity) : null;
+  const message = generateWaveMessage(checkins);
 
   const points: Point[] = checkins.map((c) => ({
     x: xFor(c.createdAt),
@@ -114,8 +127,6 @@ export function BurnoutWave() {
   }));
 
   const path = curvedPath(points);
-
-  // Area path for the gentle fill under the curve
   const areaPath = (() => {
     if (points.length < 2) return "";
     return `${path} L ${points[points.length - 1].x},130 L ${points[0].x},130 Z`;
@@ -124,42 +135,36 @@ export function BurnoutWave() {
   return (
     <Card data-testid="card-burnout-wave" className="overflow-hidden">
       <div
-        className="px-6 pt-5 pb-4"
+        className="px-6 pt-5 pb-5"
         style={{
           background: "linear-gradient(180deg, #FEFCF7 0%, #F4EEE1 100%)",
         }}
       >
-        <div className="flex items-baseline justify-between mb-2">
+        <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
           <div>
             <p
-              className="text-[11px] uppercase tracking-[0.14em] font-medium flex items-center gap-2"
-              style={{ color: COLORS.inkMute }}
+              className="text-[11px] uppercase tracking-[0.14em] font-semibold flex items-center gap-2"
+              style={{ color: COLORS.inkSoft }}
             >
-              <Waves className="h-3.5 w-3.5" strokeWidth={1.5} />
+              <Waves className="h-3.5 w-3.5" strokeWidth={2} />
               Today's Burnout Wave
             </p>
             <p
               className="font-serif italic text-sm mt-1"
-              style={{ color: COLORS.inkSoft }}
+              style={{ color: COLORS.inkMute }}
             >
               How the day has shifted, check-in by check-in.
             </p>
           </div>
-          {latestBand && (
+          {latestBand && chip && (
             <span
-              className="text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-2"
-              style={{
-                background: "white",
-                color: latestBand.key === "overloaded" ? "#A5583A"
-                  : latestBand.key === "stretched" ? "#8A5A1F"
-                  : latestBand.key === "steady" ? "#4E6E52"
-                  : "#566A2E",
-              }}
+              className="text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-2"
+              style={{ background: chip.bg, color: chip.text }}
               data-testid="text-current-band"
             >
               <span
                 className="inline-block h-2 w-2 rounded-full"
-                style={{ background: dotColorFor(latest!.intensity) }}
+                style={{ background: chip.dot }}
               />
               Currently: {latestBand.label}
             </span>
@@ -167,36 +172,48 @@ export function BurnoutWave() {
         </div>
 
         {burnout.isLoading ? (
-          <Skeleton className="h-[130px] w-full rounded-lg" />
+          <Skeleton className="h-[160px] w-full rounded-lg" />
         ) : !hasCheckins ? (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-4">
-            <p
-              className="font-serif italic"
-              style={{ color: COLORS.inkSoft }}
-            >
-              You haven't paused yet today. When you do, the wave will start to draw itself.
-            </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-2">
+            <div>
+              <p
+                className="text-[10px] uppercase tracking-[0.14em] font-bold mb-1"
+                style={{ color: COLORS.inkSoft }}
+              >
+                {message.eyebrow}
+              </p>
+              <p
+                className="font-serif text-[15px] leading-relaxed max-w-2xl"
+                style={{ color: COLORS.inkDeep }}
+              >
+                {message.body}
+              </p>
+            </div>
             <Link href="/burnout">
-              <Button data-testid="button-do-checkin-wave">
+              <Button data-testid="button-do-checkin-wave" className="shrink-0">
                 Do a 5-min check-in
               </Button>
             </Link>
           </div>
         ) : (
           <>
-            <div className="relative h-[140px] mt-2">
-              {/* Band labels behind the SVG */}
+            <div className="relative h-[160px] mt-2 rounded-md overflow-hidden">
+              {/* Colored band backgrounds with in-band labels */}
               <div className="absolute inset-0 flex flex-col pointer-events-none">
-                {["Restored", "Steady", "Stretched", "Overloaded"].map((label) => (
+                {BANDS.map((band) => (
                   <div
-                    key={label}
-                    className="flex-1 flex items-center px-2"
+                    key={band.key}
+                    className="flex-1 flex items-center px-3 border-b last:border-b-0"
+                    style={{
+                      background: band.tint,
+                      borderColor: COLORS.lineSoft,
+                    }}
                   >
                     <span
-                      className="font-serif italic text-[10px]"
-                      style={{ color: "rgba(88, 82, 74, 0.4)" }}
+                      className="font-serif italic text-[12px] font-semibold"
+                      style={{ color: band.accent }}
                     >
-                      {label}
+                      {band.label}
                     </span>
                   </div>
                 ))}
@@ -206,12 +223,8 @@ export function BurnoutWave() {
                 viewBox="0 0 1000 130"
                 preserveAspectRatio="none"
                 className="w-full h-full block relative"
+                style={{ minHeight: 160 }}
               >
-                {/* Dashed band separators */}
-                <line x1="0" y1="32.5" x2="1000" y2="32.5" stroke={COLORS.bandLine} strokeDasharray="2,4" />
-                <line x1="0" y1="65" x2="1000" y2="65" stroke={COLORS.bandLine} strokeDasharray="2,4" />
-                <line x1="0" y1="97.5" x2="1000" y2="97.5" stroke={COLORS.bandLine} strokeDasharray="2,4" />
-
                 {/* Area under the curve */}
                 {points.length >= 2 && (
                   <>
@@ -221,7 +234,7 @@ export function BurnoutWave() {
                         <stop offset="100%" stopColor={COLORS.terracotta} />
                       </linearGradient>
                     </defs>
-                    <path d={areaPath} fill="url(#waveFill)" opacity="0.15" />
+                    <path d={areaPath} fill="url(#waveFill)" opacity="0.18" />
                   </>
                 )}
 
@@ -231,29 +244,32 @@ export function BurnoutWave() {
                     d={path}
                     fill="none"
                     stroke={COLORS.sage}
-                    strokeWidth="2.5"
+                    strokeWidth="3"
                     strokeLinecap="round"
+                    strokeLinejoin="round"
                   />
                 )}
 
-                {/* Dots (all except the last) */}
+                {/* Historic dots (with a white ring for contrast) */}
                 {points.slice(0, -1).map((p) => (
                   <g key={p.time}>
+                    <circle cx={p.x} cy={p.y} r="8" fill="#FFFFFF" />
                     <circle cx={p.x} cy={p.y} r="6" fill={p.color}>
                       <title>{`${formatTime(p.time)} · ${p.state ?? "no state"}${p.note ? " · " + p.note : ""}`}</title>
                     </circle>
                   </g>
                 ))}
 
-                {/* Current dot: larger with a soft ring */}
+                {/* Current dot: white ring + soft outer ring + solid inner */}
                 {points.length > 0 && (() => {
                   const p = points[points.length - 1];
                   return (
                     <g>
-                      <circle cx={p.x} cy={p.y} r="10" fill={p.color} opacity="0.25">
+                      <circle cx={p.x} cy={p.y} r="12" fill={p.color} opacity="0.22" />
+                      <circle cx={p.x} cy={p.y} r="9" fill="#FFFFFF" />
+                      <circle cx={p.x} cy={p.y} r="7" fill={p.color}>
                         <title>{`${formatTime(p.time)} · ${p.state ?? "no state"} (current)`}</title>
                       </circle>
-                      <circle cx={p.x} cy={p.y} r="7" fill={p.color} />
                     </g>
                   );
                 })()}
@@ -262,8 +278,8 @@ export function BurnoutWave() {
 
             {/* X-axis time markers */}
             <div
-              className="flex justify-between text-[10px] font-medium mt-1"
-              style={{ color: COLORS.inkMute }}
+              className="flex justify-between text-[11px] font-semibold mt-2 px-1"
+              style={{ color: COLORS.inkSoft }}
             >
               <span>6 AM</span>
               <span>9 AM</span>
@@ -274,12 +290,51 @@ export function BurnoutWave() {
               <span>12 AM</span>
             </div>
 
+            {/* Regulation message */}
+            <div
+              className="mt-4 p-4 rounded-lg"
+              style={{
+                background: "rgba(255,255,255,0.55)",
+                border: `1px solid ${COLORS.lineSoft}`,
+              }}
+            >
+              <p
+                className="text-[10px] uppercase tracking-[0.14em] font-bold mb-1.5"
+                style={{
+                  color:
+                    message.kind === "improving"
+                      ? "#4A5A2A"
+                      : message.kind === "persistent_overload"
+                      ? "#8A3E22"
+                      : message.kind === "degrading"
+                      ? "#7A521A"
+                      : COLORS.inkSoft,
+                }}
+              >
+                {message.eyebrow}
+              </p>
+              <p
+                className="font-serif text-[15px] leading-relaxed"
+                style={{ color: COLORS.inkDeep }}
+              >
+                {message.body}
+              </p>
+            </div>
+
             <div className="flex items-center justify-between mt-3">
-              <span className="text-xs text-muted-foreground">
-                {checkins.length} {checkins.length === 1 ? "check-in" : "check-ins"} today
+              <span
+                className="text-xs font-medium"
+                style={{ color: COLORS.inkMute }}
+              >
+                {checkins.length}{" "}
+                {checkins.length === 1 ? "check-in" : "check-ins"} today
               </span>
               <Link href="/burnout">
-                <Button variant="outline" size="sm" data-testid="button-do-another-checkin">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="button-do-another-checkin"
+                >
                   Do another check-in
                 </Button>
               </Link>
