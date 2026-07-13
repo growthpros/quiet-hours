@@ -180,11 +180,18 @@ export function SpoonMeter() {
                 <MeterValue label="Free" value={fmt(remaining)} accent={C.sage} strong />
               </div>
 
-              {/* Progress bar */}
+              {/* Progress bar.
+                  Three visible segments, left to right:
+                    1. Spent (terracotta), out of total
+                    2. Committed (amber, slightly transparent), out of total
+                    3. Earned back (moss, slightly transparent), out of total
+                  The remaining space is "free" (gold background).
+                  When nothing is spent or committed but earn-back has fired,
+                  the moss segment still shows so the day's care work is visible. */}
               <div
                 className="h-3 rounded-full overflow-hidden flex mb-1"
                 style={{ background: C.gold }}
-                title={`Spent ${fmt(spent)}, committed ${fmt(committed)}, free ${fmt(remaining)}`}
+                title={`Spent ${fmt(spent)}, committed ${fmt(committed)}, earned back ${fmt(earned)}, free ${fmt(remaining)}`}
               >
                 <div
                   className="h-full"
@@ -201,10 +208,48 @@ export function SpoonMeter() {
                     opacity: 0.7,
                   }}
                 />
+                <div
+                  className="h-full"
+                  style={{
+                    width: `${total > 0 ? (earned / total) * 100 : 0}%`,
+                    background: C.moss,
+                    opacity: 0.7,
+                  }}
+                  data-testid="bar-earned-back"
+                />
               </div>
-              <div className="text-[10px] flex justify-between font-medium" style={{ color: C.inkMute }}>
-                <span>0</span>
-                <span>{fmt(total)} total</span>
+              <div
+                className="text-[10px] flex flex-wrap items-center gap-x-3 gap-y-1 font-medium mt-1"
+                style={{ color: C.inkMute }}
+              >
+                {spent > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    <span
+                      className="inline-block h-2 w-2 rounded-sm"
+                      style={{ background: C.terracotta }}
+                    />
+                    Spent
+                  </span>
+                )}
+                {committed > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    <span
+                      className="inline-block h-2 w-2 rounded-sm"
+                      style={{ background: C.amber, opacity: 0.7 }}
+                    />
+                    Committed
+                  </span>
+                )}
+                {earned > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    <span
+                      className="inline-block h-2 w-2 rounded-sm"
+                      style={{ background: C.moss, opacity: 0.7 }}
+                    />
+                    Earned back
+                  </span>
+                )}
+                <span className="ml-auto">{fmt(total)} total</span>
               </div>
             </>
           )}
