@@ -24,6 +24,11 @@ import {
   type UserProfileRow,
 } from "@/lib/foundation-data";
 import { DEFAULT_SYMPTOM_CHIPS } from "@/lib/foundation-defaults";
+import {
+  listEarnBackActions,
+  logEarnBack,
+  type EarnBackActionRow,
+} from "@/lib/spoon-data";
 
 // Phase labels shown on the badge
 const PHASE_LABELS: Record<string, string> = {
@@ -123,20 +128,61 @@ function LogModal({ pillar, currentLog, open, onClose }: LogModalProps) {
 
   const save = useMutation({
     mutationFn: async () => {
+      let previousValue: number | null = null;
+      if (currentLog?.value_numeric != null) previousValue = Number(currentLog.value_numeric);
+
+      let updated: DailyFoundationLogRow;
       if (pillar.target_type === "checkbox") {
-        return upsertTodayLog(pillar.id, { valueBool: checkboxValue });
-      }
-      if (pillar.target_type === "multiselect") {
-        return upsertTodayLog(pillar.id, {
+        updated = await upsertTodayLog(pillar.id, { valueBool: checkboxValue });
+      } else if (pillar.target_type === "multiselect") {
+        updated = await upsertTodayLog(pillar.id, {
           valueJson: JSON.stringify(multiValue),
         });
+      } else {
+        const n = numericValue.trim() === "" ? 0 : Number(numericValue);
+        if (Number.isNaN(n)) throw new Error("Enter a number.");
+        updated = await upsertTodayLog(pillar.id, { valueNumeric: n });
       }
-      const n = numericValue.trim() === "" ? 0 : Number(numericValue);
-      if (Number.isNaN(n)) throw new Error("Enter a number.");
-      return upsertTodayLog(pillar.id, { valueNumeric: n });
+
+      // Auto-fire earn-back if the pillar is linked and the target is met
+      // this update (and wasn't previously met, so we don't double-fire
+      // when the user only changes the note or increments within-target).
+      try {
+        const actions = await listEarnBackActions();
+        const linked = actions.find(
+          (a: EarnBackActionRow) =>
+            a.enabled && a.linked_pillar_key === pillar.pillar_key,
+        );
+        if (linked) {
+          const target = pillar.target_value !== null ? Number(pillar.target_value) : null;
+          let shouldFire = false;
+          if (pillar.target_type === "checkbox") {
+            shouldFire = checkboxValue && currentLog?.value_bool !== true;
+          } else if (pillar.target_type === "multiselect") {
+            shouldFire = false; // symptom logs don't earn spoons
+          } else if (target != null) {
+            const newN = numericValue.trim() === "" ? 0 : Number(numericValue);
+            const wasMet = previousValue != null && previousValue >= target;
+            shouldFire = newN >= target && !wasMet;
+          }
+          if (shouldFire) {
+            await logEarnBack({
+              action: linked,
+              durationMinutes: linked.duration_min_minutes ?? null,
+              note: `auto-fired from ${pillar.pillar_key}`,
+            });
+          }
+        }
+      } catch {
+        // Silent: earn-back failure should not block Foundation logging.
+      }
+
+      return updated;
     },
     onSuccess: (_data) => {
       qc.invalidateQueries({ queryKey: ["/api/foundation/logs", "today"] });
+      qc.invalidateQueries({ queryKey: ["/api/spoon/ledger", "today"] });
+      qc.invalidateQueries({ queryKey: ["/api/earn-back/events", "today"] });
       const met = (() => {
         if (pillar.target_type === "checkbox") return checkboxValue;
         if (pillar.target_type === "multiselect") return multiValue.length > 0;

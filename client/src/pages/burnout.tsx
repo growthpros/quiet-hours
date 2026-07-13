@@ -43,6 +43,8 @@ import {
 } from "@/lib/burnout-utils";
 import { ChipMultiSelect } from "@/components/chip-multiselect";
 import { PULL_OPTIONS } from "@/lib/burnout-options-const";
+import { maybeIssueSpoonsFromCheckin } from "@/lib/spoon-data";
+import type { BurnoutCheckinRow } from "@/lib/supabase";
 
 const ENERGY_SCALE = [
   { v: 1, label: "Depleted" },
@@ -150,7 +152,7 @@ function CheckinCard() {
 
   const save = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/burnout", {
+      const res = await apiRequest("POST", "/api/burnout", {
         energy,
         sensory,
         symptoms: JSON.stringify(symptoms),
@@ -158,10 +160,38 @@ function CheckinCard() {
         pulls: JSON.stringify(pulls),
         note: note.trim() || null,
       });
+      // Try to parse the created check-in so we can issue spoons if this
+      // is the day's first. If parsing fails, that's non-fatal.
+      try {
+        const created = await res.json();
+        if (created && typeof created === "object") {
+          const row: BurnoutCheckinRow = {
+            id: Number(created.id ?? 0),
+            user_id: String(created.userId ?? created.user_id ?? ""),
+            energy: Number(created.energy ?? energy),
+            sensory: Number(created.sensory ?? sensory),
+            intensity: Number(created.intensity ?? 0),
+            symptoms: String(created.symptoms ?? JSON.stringify(symptoms)),
+            state: (created.state ?? state) as string | null,
+            pulls: String(created.pulls ?? JSON.stringify(pulls)),
+            note: (created.note ?? (note.trim() || null)) as string | null,
+            created_at: Number(created.createdAt ?? created.created_at ?? Date.now()),
+          };
+          try {
+            await maybeIssueSpoonsFromCheckin(row);
+          } catch {
+            // If spoon issuance fails, don't block the check-in save.
+          }
+        }
+      } catch {
+        // Parse failure is fine; the check-in still saved.
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/burnout", "today"] });
       queryClient.invalidateQueries({ queryKey: ["/api/burnout/streaks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/burnout", "recent-14d"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/spoon/ledger", "today"] });
       setSaved(true);
     },
   });
