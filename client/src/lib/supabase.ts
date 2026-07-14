@@ -22,7 +22,13 @@ export const supabase = createClient(url, anonKey, {
     // prevents the client from also trying (and racing) to read a URL that
     // may no longer contain the code.
     detectSessionInUrl: false,
-    flowType: "pkce",
+    // Use implicit flow: Supabase returns tokens in the URL hash
+    // (#access_token=..., #refresh_token=...) instead of a ?code= that
+    // needs to be exchanged. Implicit doesn't require a code_verifier in
+    // the browser's localStorage, so the sign-in link works even when it
+    // opens in a different browser than the one that requested it.
+    // For a personal beta tool this tradeoff is fine.
+    flowType: "implicit",
   },
 });
 
