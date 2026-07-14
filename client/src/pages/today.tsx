@@ -19,6 +19,7 @@ import type {
   CompassionEntry,
 } from "@shared/schema";
 import { DAILY_THOUGHTS } from "@/lib/quiet-hours-data";
+import type { DailyThought } from "@/lib/quiet-hours-data";
 import { FoundationCard } from "@/components/foundation-card";
 import { BurnoutWave } from "@/components/burnout-wave";
 import { SpoonMeter } from "@/components/spoon-meter";
@@ -180,6 +181,9 @@ export default function Today() {
         activeRuns={activeRuns}
         scriptCount={scriptCount}
         compassionCount={compassionCount}
+        delegationLoading={delegation.isLoading}
+        checklistsLoading={checklists.isLoading}
+        compassionLoading={compassion.isLoading}
       />
     </ViewingDateProvider>
   );
@@ -187,14 +191,27 @@ export default function Today() {
 
 interface TodayInnerProps {
   nudge: Nudge | null;
-  thought: string;
+  thought: DailyThought;
   openTasks: number;
   activeRuns: number;
   scriptCount: number;
   compassionCount: number;
+  delegationLoading: boolean;
+  checklistsLoading: boolean;
+  compassionLoading: boolean;
 }
 
-function TodayInner({ nudge, thought, openTasks, activeRuns, scriptCount, compassionCount }: TodayInnerProps) {
+function TodayInner({
+  nudge,
+  thought,
+  openTasks,
+  activeRuns,
+  scriptCount,
+  compassionCount,
+  delegationLoading,
+  checklistsLoading,
+  compassionLoading,
+}: TodayInnerProps) {
   const { isToday } = useViewingDate();
 
   return (
@@ -251,7 +268,7 @@ function TodayInner({ nudge, thought, openTasks, activeRuns, scriptCount, compas
               ? "no tasks logged yet"
               : `${openTasks} open ${openTasks === 1 ? "task" : "tasks"}`
           }
-          loading={delegation.isLoading}
+          loading={delegationLoading}
           testid="link-cross-delegation"
         />
         <CrossCard
@@ -265,7 +282,7 @@ function TodayInner({ nudge, thought, openTasks, activeRuns, scriptCount, compas
               ? "6 templates ready"
               : `${activeRuns} in progress · 6 templates ready`
           }
-          loading={checklists.isLoading}
+          loading={checklistsLoading}
           testid="link-cross-good-enough"
         />
         <CrossCard
@@ -288,7 +305,7 @@ function TodayInner({ nudge, thought, openTasks, activeRuns, scriptCount, compas
               ? "no entries yet"
               : `${compassionCount} ${compassionCount === 1 ? "entry" : "entries"} logged`
           }
-          loading={compassion.isLoading}
+          loading={compassionLoading}
           testid="link-cross-compassion"
         />
       </div>
