@@ -16,7 +16,13 @@ export const supabase = createClient(url, anonKey, {
     // Persist session in localStorage; auto-refresh so users stay signed in.
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    // We handle the URL callback manually in auth-provider.tsx BEFORE the
+    // hash router mounts, otherwise the router rewrites the URL and drops
+    // Supabase's ?code=... param. Setting detectSessionInUrl to false
+    // prevents the client from also trying (and racing) to read a URL that
+    // may no longer contain the code.
+    detectSessionInUrl: false,
+    flowType: "pkce",
   },
 });
 
