@@ -9,6 +9,8 @@ import {
   History as HistoryIcon,
   Moon,
   Settings as SettingsIcon,
+  CheckSquare,
+  Cloud,
 } from "lucide-react";
 import {
   Sidebar,
@@ -26,6 +28,8 @@ import { useTheme } from "@/components/theme-provider";
 
 export const NAV_ITEMS = [
   { title: "Today", url: "/", icon: Sun },
+  { title: "Tasks", url: "/tasks", icon: CheckSquare },
+  { title: "Brain dump", url: "/brain-dump", icon: Cloud },
   { title: "Delegation", url: "/delegation", icon: Split },
   { title: "Good Enough", url: "/good-enough", icon: ListChecks },
   { title: "Reframes", url: "/reframes", icon: Quote },

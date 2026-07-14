@@ -18,6 +18,8 @@ import Today from "@/pages/today";
 import Foundation from "@/pages/foundation";
 import EarnBack from "@/pages/earn-back";
 import Delegation from "@/pages/delegation";
+import Tasks from "@/pages/tasks";
+import BrainDump from "@/pages/brain-dump";
 import GoodEnough from "@/pages/good-enough";
 import Reframes from "@/pages/reframes";
 import Compassion from "@/pages/compassion";
@@ -31,6 +33,8 @@ function AppRouter() {
       <Route path="/" component={Today} />
       <Route path="/foundation" component={Foundation} />
       <Route path="/earn-back" component={EarnBack} />
+      <Route path="/tasks" component={Tasks} />
+      <Route path="/brain-dump" component={BrainDump} />
       <Route path="/delegation" component={Delegation} />
       <Route path="/good-enough" component={GoodEnough} />
       <Route path="/reframes" component={Reframes} />

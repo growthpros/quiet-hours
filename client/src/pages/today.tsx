@@ -14,10 +14,10 @@ import {
   ArrowRight,
 } from "lucide-react";
 import type {
-  DelegationTask,
   ChecklistRun,
   CompassionEntry,
 } from "@shared/schema";
+import { listTasks, type TaskRow } from "@/lib/tasks-data";
 import { DAILY_THOUGHTS } from "@/lib/quiet-hours-data";
 import type { DailyThought } from "@/lib/quiet-hours-data";
 import { FoundationCard } from "@/components/foundation-card";
@@ -146,8 +146,9 @@ function CrossCard({
 }
 
 export default function Today() {
-  const delegation = useQuery<DelegationTask[]>({
-    queryKey: ["/api/delegation"],
+  const activeTasksQ = useQuery<TaskRow[]>({
+    queryKey: ["tasks"],
+    queryFn: listTasks,
   });
   const checklists = useQuery<ChecklistRun[]>({
     queryKey: ["/api/checklists"],
@@ -160,7 +161,7 @@ export default function Today() {
   });
 
   const openTasks =
-    delegation.data?.filter((t) => !t.completed).length ?? 0;
+    activeTasksQ.data?.filter((t) => t.completed_at == null).length ?? 0;
   const activeRuns =
     checklists.data?.filter((c) => !c.shipped).length ?? 0;
   const scriptCount = 8; // static reframes library size
@@ -182,7 +183,7 @@ export default function Today() {
         activeRuns={activeRuns}
         scriptCount={scriptCount}
         compassionCount={compassionCount}
-        delegationLoading={delegation.isLoading}
+        tasksLoading={activeTasksQ.isLoading}
         checklistsLoading={checklists.isLoading}
         compassionLoading={compassion.isLoading}
       />
@@ -197,7 +198,7 @@ interface TodayInnerProps {
   activeRuns: number;
   scriptCount: number;
   compassionCount: number;
-  delegationLoading: boolean;
+  tasksLoading: boolean;
   checklistsLoading: boolean;
   compassionLoading: boolean;
 }
@@ -209,7 +210,7 @@ function TodayInner({
   activeRuns,
   scriptCount,
   compassionCount,
-  delegationLoading,
+  tasksLoading,
   checklistsLoading,
   compassionLoading,
 }: TodayInnerProps) {
@@ -262,18 +263,18 @@ function TodayInner({
       {/* ---------- Four cross-link cards ---------- */}
       <div className="grid gap-4 md:grid-cols-2">
         <CrossCard
-          href="/delegation"
+          href="/tasks"
           icon={LayoutGrid}
           eyebrow="The day's tasks"
-          title="Sort what's in front of you"
-          body="Place each task on the urgency × importance grid. Decide who really needs to do it."
+          title="One small next thing"
+          body="A working list, kept small. Add spoon estimates when it helps, skip them when it doesn't."
           status={
             openTasks === 0
-              ? "no tasks logged yet"
-              : `${openTasks} open ${openTasks === 1 ? "task" : "tasks"}`
+              ? "nothing on the list"
+              : `${openTasks} active ${openTasks === 1 ? "task" : "tasks"}`
           }
-          loading={delegationLoading}
-          testid="link-cross-delegation"
+          loading={tasksLoading}
+          testid="link-cross-tasks"
         />
         <CrossCard
           href="/good-enough"
