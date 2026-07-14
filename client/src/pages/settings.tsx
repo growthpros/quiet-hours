@@ -21,6 +21,7 @@ import {
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/hooks/use-toast";
 import { exportAllMyData, deleteAllMyData } from "@/lib/data";
+import { CheckInCadenceCard } from "@/components/checkin-cadence-card";
 import { queryClient } from "@/lib/queryClient";
 import { Download, LogOut, Trash2 } from "lucide-react";
 
@@ -96,6 +97,8 @@ export default function Settings() {
           </Button>
         </CardContent>
       </Card>
+
+      <CheckInCadenceCard />
 
       <Card>
         <CardHeader className="pb-2">

@@ -24,6 +24,7 @@ import { FoundationCard } from "@/components/foundation-card";
 import { BurnoutWave } from "@/components/burnout-wave";
 import { SpoonMeter } from "@/components/spoon-meter";
 import { PhaseSuggestionBanner } from "@/components/phase-suggestion";
+import { CheckInNudge } from "@/components/checkin-nudge";
 import { DayNavigator, ViewingHistoryRibbon } from "@/components/day-navigator";
 import { ViewingDateProvider, useViewingDate } from "@/lib/viewing-date";
 
@@ -245,6 +246,9 @@ function TodayInner({
 
       {/* ---------- Phase-shift suggestion (today only) ---------- */}
       {isToday && <PhaseSuggestionBanner />}
+
+      {/* ---------- Check-in cadence nudge (today only, cadence-driven) ---------- */}
+      {isToday && <CheckInNudge />}
 
       {/* ---------- Burnout Wave (date-aware) ---------- */}
       <BurnoutWave />

@@ -39,6 +39,14 @@ export interface DailyFoundationLogRow {
   updated_at: number;
 }
 
+export type CheckinCadence =
+  | "off"
+  | "morning"
+  | "every_hour"
+  | "every_2h"
+  | "every_3h"
+  | "custom";
+
 export interface UserProfileRow {
   user_id: string;
   diagnosis:
@@ -61,6 +69,8 @@ export interface UserProfileRow {
   insights_opt_in: boolean;
   learning_style: "jump_in" | "guided_first_time" | "show_me_everything";
   seeded_pillars: boolean;
+  checkin_cadence: CheckinCadence;
+  checkin_cadence_minutes: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -119,6 +129,8 @@ export async function updateProfile(
       | "insights_opt_in"
       | "learning_style"
       | "seeded_pillars"
+      | "checkin_cadence"
+      | "checkin_cadence_minutes"
     >
   >,
 ): Promise<UserProfileRow> {
