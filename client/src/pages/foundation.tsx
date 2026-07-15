@@ -87,7 +87,7 @@ export default function Foundation() {
     mutationFn: async (id: number) => deletePillar(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/foundation/pillars"] });
-      qc.invalidateQueries({ queryKey: ["/api/foundation/logs", "today"] });
+      qc.invalidateQueries({ queryKey: ["/api/foundation/logs"] });
       toast({ title: "Pillar removed." });
     },
   });
