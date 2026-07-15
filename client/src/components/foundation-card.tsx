@@ -182,9 +182,13 @@ function LogModal({ pillar, currentLog, open, onClose }: LogModalProps) {
       return updated;
     },
     onSuccess: (_data) => {
-      qc.invalidateQueries({ queryKey: ["/api/foundation/logs", "today"] });
-      qc.invalidateQueries({ queryKey: ["/api/spoon/ledger", "today"] });
-      qc.invalidateQueries({ queryKey: ["/api/earn-back/events", "today"] });
+      // Invalidate ALL date-keyed variants of these queries, not just the
+      // literal 'today' key. Foundation/SpoonMeter query using the current
+      // viewing date (e.g. '2026-07-14'), so keying by the literal 'today'
+      // string never matched and cache was stale until manual refresh.
+      qc.invalidateQueries({ queryKey: ["/api/foundation/logs"] });
+      qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
+      qc.invalidateQueries({ queryKey: ["/api/earn-back/events"] });
       const met = (() => {
         if (pillar.target_type === "checkbox") return checkboxValue;
         if (pillar.target_type === "multiselect") return multiValue.length > 0;

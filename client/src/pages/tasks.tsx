@@ -258,7 +258,10 @@ function NewTaskDialog() {
       spoonEstimate: spoonNum,
     });
     qc.invalidateQueries({ queryKey: ["tasks"] });
-    qc.invalidateQueries({ queryKey: ["/api/spoon/ledger", "today"] });
+    // Invalidate every date-keyed spoon ledger + events query so the
+    // Today SpoonMeter recomputes committed from the fresh tasks list.
+    qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
+    qc.invalidateQueries({ queryKey: ["/api/earn-back/events"] });
     setOpen(false);
     resetForm();
     toast({ title: "Task added." });

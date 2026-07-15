@@ -188,10 +188,10 @@ function CheckinCard() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/burnout", "today"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/burnout"] });
       queryClient.invalidateQueries({ queryKey: ["/api/burnout/streaks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/burnout", "recent-14d"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/spoon/ledger", "today"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
       setSaved(true);
     },
   });
@@ -603,7 +603,7 @@ function SummaryColumn() {
     mutationFn: async () =>
       apiRequest("POST", "/api/burnout/clear-today"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/burnout", "today"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/burnout"] });
       toast({ title: "Today's check-ins cleared." });
     },
   });
