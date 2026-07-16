@@ -75,6 +75,16 @@ export function SpoonMeter() {
     queryFn: () => listEarnBackEventsForDate(date),
   });
 
+  // Today's committed spoons come from the sum of active-task estimates,
+  // not from the ledger.committed column (which is never touched by the
+  // tasks system). Recompute on every render so adding/completing tasks
+  // updates the meter without a page reload.
+  const activeTasksQ = useQuery({
+    queryKey: ["tasks"],
+    queryFn: listTasks,
+    enabled: isToday,
+  });
+
   const log = useMutation({
     mutationFn: async (action: EarnBackActionRow) => {
       if (!isToday) throw new Error("Past days are read-only.");
@@ -122,7 +132,18 @@ export function SpoonMeter() {
 
   const total = ledger ? Number(ledger.allotted) + Number(ledger.earned_back) : 0;
   const spent = ledger ? Number(ledger.spent) : 0;
-  const committed = ledger ? Number(ledger.committed) : 0;
+  const committed = isToday
+    ? (activeTasksQ.data ?? [])
+        .filter((t) => t.completed_at == null)
+        .reduce(
+          (acc, t) =>
+            acc +
+            (t.spoon_estimate != null ? Number(t.spoon_estimate) : 0),
+          0,
+        )
+    : ledger
+    ? Number(ledger.committed)
+    : 0;
   const earned = ledger ? Number(ledger.earned_back) : 0;
   const remaining = Math.max(0, total - spent - committed);
 
