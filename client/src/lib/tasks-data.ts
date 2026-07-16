@@ -326,24 +326,33 @@ export async function breakDownTask(input: {
 }
 
 // Mark specific parsed_items as processed (i.e. promoted to a real task).
+// Also clears it from skipped_indices if present, so a user reviewing
+// skipped items can un-skip them and commit as a task.
 export async function markBrainDumpProcessed(
   brainDumpId: number,
   index: number,
 ): Promise<void> {
-  // Read-modify-write. Cheap because the array is small.
   const { data: current, error: fetchErr } = await supabase
     .from("brain_dumps")
-    .select("processed_indices")
+    .select("processed_indices, skipped_indices")
     .eq("id", brainDumpId)
     .single();
   if (fetchErr) throw fetchErr;
-  const current_indices: number[] =
-    (current as { processed_indices: number[] })?.processed_indices ?? [];
-  if (current_indices.includes(index)) return;
-  const next = [...current_indices, index];
+  const c = current as {
+    processed_indices: number[];
+    skipped_indices: number[];
+  };
+  const processed = c?.processed_indices ?? [];
+  const skipped = c?.skipped_indices ?? [];
+
+  const nextProcessed = processed.includes(index)
+    ? processed
+    : [...processed, index];
+  const nextSkipped = skipped.filter((i) => i !== index);
+
   const { error } = await supabase
     .from("brain_dumps")
-    .update({ processed_indices: next })
+    .update({ processed_indices: nextProcessed, skipped_indices: nextSkipped })
     .eq("id", brainDumpId);
   if (error) throw error;
 }
