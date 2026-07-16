@@ -75,11 +75,11 @@ export function SpoonMeter() {
     queryFn: () => listEarnBackEventsForDate(date),
   });
 
-  // Today's committed spoons come from the sum of active-task estimates,
-  // not from the ledger.committed column (which is never touched by the
-  // tasks system). Recompute on every render so adding/completing tasks
-  // updates the meter without a page reload.
-  const activeTasksQ = useQuery({
+  // Today's SpoonMeter recomputes Committed and Spent from the tasks
+  // cache on every render. Committed = active-task spoons; Spent =
+  // ledger.spent (from burnout/phase writes) + today's completed-task
+  // spoons. Adding/completing tasks updates the meter without reload.
+  const tasksQ = useQuery({
     queryKey: ["tasks"],
     queryFn: listTasks,
     enabled: isToday,
@@ -131,9 +131,35 @@ export function SpoonMeter() {
   const events = eventsQ.data ?? [];
 
   const total = ledger ? Number(ledger.allotted) + Number(ledger.earned_back) : 0;
-  const spent = ledger ? Number(ledger.spent) : 0;
+
+  // Today's task-completion spoons: when a task with a spoon estimate is
+  // checked off, those spoons move from Committed to Spent. Compute this
+  // live from the tasks cache so completion is reflected immediately,
+  // matching how Committed works.
+  const startOfToday = (() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  })();
+  const spentFromTasksToday = isToday
+    ? (tasksQ.data ?? [])
+        .filter(
+          (t) =>
+            t.completed_at != null &&
+            (t.completed_at as number) >= startOfToday,
+        )
+        .reduce(
+          (acc, t) =>
+            acc +
+            (t.spoon_estimate != null ? Number(t.spoon_estimate) : 0),
+          0,
+        )
+    : 0;
+
+  const spent = (ledger ? Number(ledger.spent) : 0) + spentFromTasksToday;
+
   const committed = isToday
-    ? (activeTasksQ.data ?? [])
+    ? (tasksQ.data ?? [])
         .filter((t) => t.completed_at == null)
         .reduce(
           (acc, t) =>
