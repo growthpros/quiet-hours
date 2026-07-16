@@ -91,6 +91,15 @@ type SpeechRecognitionInstance = {
   stop: () => void;
 };
 
+// Web Speech API result event: `results` is cumulative across events;
+// `resultIndex` is where the new results start in this event. Older code
+// looped from 0, which appended every prior result on every event, causing
+// exponential duplication in the transcript.
+interface SpeechResultEvent {
+  resultIndex: number;
+  results: Array<{ 0: { transcript: string }; isFinal: boolean }>;
+}
+
 function getSpeechRecognitionCtor():
   | (new () => SpeechRecognitionInstance)
   | null {
@@ -106,6 +115,9 @@ function getSpeechRecognitionCtor():
 
 interface ReviewFlowProps {
   dump: BrainDumpRow;
+  // 'remaining' = items still unprocessed and unskipped (the default flow)
+  // 'skipped'   = items in skipped_indices, so user can un-skip and add
+  mode: "remaining" | "skipped";
   open: boolean;
   onClose: () => void;
 }
@@ -123,7 +135,7 @@ interface FlowItem {
   taskId?: number;
 }
 
-function ReviewFlow({ dump, open, onClose }: ReviewFlowProps) {
+function ReviewFlow({ dump, mode, open, onClose }: ReviewFlowProps) {
   const qc = useQueryClient();
   const { toast } = useToast();
 
@@ -145,20 +157,32 @@ function ReviewFlow({ dump, open, onClose }: ReviewFlowProps) {
   useEffect(() => {
     if (!open) return;
     const items = dump.parsed_items ?? [];
-    const done = new Set([
-      ...(dump.processed_indices ?? []),
-      ...(dump.skipped_indices ?? []),
-    ]);
-    const remaining: FlowItem[] = items
-      .map((it, i): FlowItem | null => (done.has(i) ? null : { item: it, originalIdx: i }))
-      .filter((x): x is FlowItem => x !== null);
-    setFlow(remaining);
+    let subset: FlowItem[];
+    if (mode === "skipped") {
+      const skippedSet = new Set(dump.skipped_indices ?? []);
+      subset = items
+        .map((it, i): FlowItem | null =>
+          skippedSet.has(i) ? { item: it, originalIdx: i } : null,
+        )
+        .filter((x): x is FlowItem => x !== null);
+    } else {
+      const done = new Set([
+        ...(dump.processed_indices ?? []),
+        ...(dump.skipped_indices ?? []),
+      ]);
+      subset = items
+        .map((it, i): FlowItem | null =>
+          done.has(i) ? null : { item: it, originalIdx: i },
+        )
+        .filter((x): x is FlowItem => x !== null);
+    }
+    setFlow(subset);
     setCurrentIdx(0);
     setTimeline("today");
     setSpecificDate("");
     setEditing(false);
     setEditValue(null);
-  }, [open, dump.id, dump.parsed_at]);
+  }, [open, dump.id, dump.parsed_at, mode]);
 
   const currentFlowItem: FlowItem | null = flow[currentIdx] ?? null;
   const currentItem: ParsedTaskItem | null = currentFlowItem?.item ?? null;
@@ -538,6 +562,11 @@ function DumpCard({ dump }: { dump: BrainDumpRow }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [reviewOpen, setReviewOpen] = useState(false);
+  // When 'skipped', ReviewFlow shows only the items in skipped_indices
+  // so the user can un-skip and re-consider them.
+  const [reviewMode, setReviewMode] = useState<"remaining" | "skipped">(
+    "remaining",
+  );
 
   const parsing = useMutation({
     mutationFn: async () => parseBrainDump(dump.id),
@@ -600,41 +629,60 @@ function DumpCard({ dump }: { dump: BrainDumpRow }) {
             </div>
           )}
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs italic text-muted-foreground">
               {formatRelative(dump.created_at)}
             </p>
-            {!hasBeenParsed ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => parsing.mutate()}
-                disabled={parsing.isPending}
-                data-testid={`button-braindump-parse-${dump.id}`}
-              >
-                <Wand2 className="mr-1 h-3.5 w-3.5" />
-                {parsing.isPending ? "Parsing\u2026" : "Parse with AI"}
-              </Button>
-            ) : remaining > 0 ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setReviewOpen(true)}
-                data-testid={`button-braindump-continue-${dump.id}`}
-              >
-                Continue reviewing ({remaining} left)
-              </Button>
-            ) : (
-              <p className="text-xs italic text-muted-foreground">
-                All reviewed
-              </p>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {hasBeenParsed && skippedCount > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setReviewMode("skipped");
+                    setReviewOpen(true);
+                  }}
+                  data-testid={`button-braindump-skipped-${dump.id}`}
+                >
+                  Review skipped ({skippedCount})
+                </Button>
+              )}
+              {!hasBeenParsed ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => parsing.mutate()}
+                  disabled={parsing.isPending}
+                  data-testid={`button-braindump-parse-${dump.id}`}
+                >
+                  <Wand2 className="mr-1 h-3.5 w-3.5" />
+                  {parsing.isPending ? "Parsing\u2026" : "Parse with AI"}
+                </Button>
+              ) : remaining > 0 ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setReviewMode("remaining");
+                    setReviewOpen(true);
+                  }}
+                  data-testid={`button-braindump-continue-${dump.id}`}
+                >
+                  Continue reviewing ({remaining} left)
+                </Button>
+              ) : (
+                <p className="text-xs italic text-muted-foreground">
+                  All reviewed
+                </p>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
       {hasBeenParsed && (
         <ReviewFlow
           dump={dump}
+          mode={reviewMode}
           open={reviewOpen}
           onClose={() => setReviewOpen(false)}
         />
@@ -678,16 +726,20 @@ export default function BrainDump() {
     rec.interimResults = false;
     rec.lang = "en-US";
     rec.onresult = (e: unknown) => {
-      const evt = e as { results: Array<{ 0: { transcript: string }; isFinal: boolean }> };
-      const results = evt.results;
-      let transcript = "";
-      for (let i = 0; i < results.length; i++) {
-        if (results[i].isFinal) {
-          transcript += results[i][0].transcript + " ";
+      const evt = e as SpeechResultEvent;
+      // Only look at results that arrived in THIS event, starting at
+      // evt.resultIndex. Anything before that was already appended by a
+      // prior fire.
+      let newFinalText = "";
+      for (let i = evt.resultIndex; i < evt.results.length; i++) {
+        const r = evt.results[i];
+        if (r.isFinal) {
+          newFinalText += r[0].transcript + " ";
         }
       }
-      if (transcript) {
-        setContent((prev) => (prev ? prev + " " + transcript.trim() : transcript.trim()));
+      const trimmed = newFinalText.trim();
+      if (trimmed) {
+        setContent((prev) => (prev ? prev + " " + trimmed : trimmed));
       }
     };
     rec.onend = () => {
