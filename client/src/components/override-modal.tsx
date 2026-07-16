@@ -9,7 +9,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -41,7 +42,14 @@ interface OverrideModalProps {
 
 export function OverrideModal({ open, spoonsOver, onCancel, onConfirmed }: OverrideModalProps) {
   const qc = useQueryClient();
-  const [step, setStep] = useState<"choose" | "reflect">("choose");
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+  // 'choose' shows the category grid (or the soft-interrupt banner if the
+  // user has already overridden 3+ times in the last 7 days). 'reflect'
+  // is the free-text step. 'categories' is reached from the soft-interrupt
+  // banner when the user clicks 'Still override' and needs to still pick
+  // a category. Regular flow: choose → reflect.
+  const [step, setStep] = useState<"choose" | "categories" | "reflect">("choose");
   const [category, setCategory] = useState<string | null>(null);
   const [freeText, setFreeText] = useState("");
 
@@ -70,19 +78,21 @@ export function OverrideModal({ open, spoonsOver, onCancel, onConfirmed }: Overr
     },
   });
 
-  // Soft interrupt: 3+ overrides in last 7 days
-  const showSoftInterrupt = (priorQ.data ?? 0) >= 3;
+  // Soft interrupt: 3+ overrides in last 7 days, but only on first entry.
+  // Once the user has clicked 'Still override', they've acknowledged the
+  // pattern and shouldn't be re-blocked on this same modal instance.
+  const showSoftInterrupt = step === "choose" && (priorQ.data ?? 0) >= 3;
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-serif">
-            {step === "choose" ? "Over your spoon limit" : "Say a little more?"}
+            {step === "reflect" ? "Say a little more?" : "Over your spoon limit"}
           </DialogTitle>
         </DialogHeader>
 
-        {showSoftInterrupt && step === "choose" ? (
+        {showSoftInterrupt ? (
           <div className="space-y-4">
             <div
               className="rounded-lg p-4 flex gap-3"
@@ -96,23 +106,39 @@ export function OverrideModal({ open, spoonsOver, onCancel, onConfirmed }: Overr
                 <p className="text-sm mt-1 font-serif" style={{ color: "#3D3A34" }}>
                   That's the pattern, not the plan. A third override is usually where the crash begins. Want to look at what's been asking too much lately?
                 </p>
+                <p className="text-xs mt-2 italic" style={{ color: "#6D655A" }}>
+                  Heads up: if you cancel or step away to History, this task won't save. Come back and re-enter it if you want to add it.
+                </p>
               </div>
             </div>
             <div className="flex flex-wrap justify-end gap-2">
-              <Button variant="ghost" onClick={onCancel}>
+              <Button variant="ghost" onClick={onCancel} data-testid="override-cancel">
                 Cancel adding this
               </Button>
-              <Link href="/history">
-                <Button variant="outline" onClick={onCancel}>
-                  See my week
-                </Button>
-              </Link>
-              <Button variant="outline" onClick={() => { /* just proceed to categories */ }}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  onCancel();
+                  toast({
+                    title: "Task not saved.",
+                    description: "Come back to Tasks when you're ready to try again.",
+                  });
+                  navigate("/history");
+                }}
+                data-testid="override-see-week"
+              >
+                See my week
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setStep("categories")}
+                data-testid="override-still"
+              >
                 Still override
               </Button>
             </div>
           </div>
-        ) : step === "choose" ? (
+        ) : step === "choose" || step === "categories" ? (
           <>
             <p className="text-sm font-serif italic" style={{ color: "#3D3A34" }}>
               This puts you {spoonsOver} {Math.abs(spoonsOver) === 1 ? "spoon" : "spoons"} over. Sometimes you know best. What's going on?
