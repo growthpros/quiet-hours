@@ -7,6 +7,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider, useAuth } from "@/components/auth-provider";
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { rollOverPreviousTodayTasks } from "@/lib/tasks-data";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BottomNav } from "@/components/bottom-nav";
 import { SiteFooter } from "@/components/site-footer";
@@ -77,6 +80,28 @@ function AuthedShell() {
 
 function AuthGate() {
   const { session, loading } = useAuth();
+  const qc = useQueryClient();
+
+  // On sign-in, roll any incomplete 'today' tasks from previous days
+  // forward. Runs once per session. Idempotent server-side, so retries
+  // are safe.
+  useEffect(() => {
+    if (!session) return;
+    void (async () => {
+      try {
+        const rolled = await rollOverPreviousTodayTasks();
+        if (rolled > 0) {
+          qc.invalidateQueries({ queryKey: ["tasks"] });
+          qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
+        }
+      } catch (e) {
+        // Non-fatal, don't block sign-in.
+        // eslint-disable-next-line no-console
+        console.warn("[rollover] failed", e);
+      }
+    })();
+  }, [session?.user.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
