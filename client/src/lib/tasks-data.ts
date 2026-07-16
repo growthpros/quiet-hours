@@ -235,6 +235,25 @@ export async function deleteBrainDump(id: number): Promise<void> {
 
 // ---------- Brain Dump AI-parse workflow ----------
 
+// Coerce anything Supabase / Deno throws into a real Error with a readable
+// message. Supabase's error objects and FunctionsHttpError instances don't
+// stringify well ('[object Object]'), so we extract known fields.
+function toReadableError(e: unknown, fallback: string): Error {
+  if (e instanceof Error) return e;
+  if (typeof e === "string") return new Error(e);
+  if (e && typeof e === "object") {
+    const rec = e as Record<string, unknown>;
+    const msg =
+      (typeof rec.message === "string" && rec.message) ||
+      (typeof rec.error === "string" && rec.error) ||
+      (typeof rec.details === "string" && rec.details) ||
+      (typeof rec.hint === "string" && rec.hint) ||
+      JSON.stringify(rec).slice(0, 300);
+    return new Error(msg);
+  }
+  return new Error(fallback);
+}
+
 // Invoke the parse-brain-dump edge function. It calls Claude, which returns
 // a JSON array of ParsedTaskItem. We store the result on the brain_dump row.
 export async function parseBrainDump(id: number): Promise<BrainDumpRow> {
@@ -244,7 +263,7 @@ export async function parseBrainDump(id: number): Promise<BrainDumpRow> {
     .select("*")
     .eq("id", id)
     .single();
-  if (fetchErr) throw fetchErr;
+  if (fetchErr) throw toReadableError(fetchErr, "Failed to load brain dump");
 
   // Call the edge function
   const { data: result, error: fnErr } = await supabase.functions.invoke(
@@ -255,7 +274,13 @@ export async function parseBrainDump(id: number): Promise<BrainDumpRow> {
       },
     },
   );
-  if (fnErr) throw fnErr;
+  if (fnErr) {
+    throw toReadableError(fnErr, "AI parse call failed");
+  }
+  // The edge function itself may return an error body with HTTP 200.
+  if (result && typeof result === "object" && "error" in result && !("items" in result)) {
+    throw new Error(String((result as { error: unknown }).error));
+  }
   const items: ParsedTaskItem[] = Array.isArray(result?.items) ? result.items : [];
 
   // Persist the parse
@@ -271,7 +296,12 @@ export async function parseBrainDump(id: number): Promise<BrainDumpRow> {
     .eq("id", id)
     .select()
     .single();
-  if (updErr) throw updErr;
+  if (updErr) {
+    throw toReadableError(
+      updErr,
+      "Couldn't save the parsed tasks. Try again in a moment.",
+    );
+  }
   return updated as BrainDumpRow;
 }
 
@@ -288,7 +318,10 @@ export async function breakDownTask(input: {
       body: { title: input.title, notes: input.notes ?? null },
     },
   );
-  if (error) throw error;
+  if (error) throw toReadableError(error, "Break-down call failed");
+  if (data && typeof data === "object" && "error" in data && !("items" in data)) {
+    throw new Error(String((data as { error: unknown }).error));
+  }
   return Array.isArray(data?.items) ? (data.items as ParsedTaskItem[]) : [];
 }
 
