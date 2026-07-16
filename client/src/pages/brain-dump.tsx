@@ -108,23 +108,34 @@ interface ReviewFlowProps {
   onClose: () => void;
 }
 
+// Rebuild the review flow as a linear queue of ParsedTaskItem's. Each item
+// remembers whether it came from the original parse (`originalIdx: number`)
+// or was spliced in from a break-down (`originalIdx: null`). This is simpler
+// than the prior two-array design and avoids the index-math bugs.
+interface FlowItem {
+  item: ParsedTaskItem;
+  originalIdx: number | null; // null = came from break-down, not persisted on brain_dump
+}
+
 function ReviewFlow({ dump, open, onClose }: ReviewFlowProps) {
   const qc = useQueryClient();
   const { toast } = useToast();
 
-  // Which parsed_items indices are still unprocessed. Computed once when
-  // opened so the deck doesn't shift under the user mid-review.
-  const [queue, setQueue] = useState<number[]>([]);
-  const [currentIdx, setCurrentIdx] = useState(0); // index into queue
-  const [addedSubtasks, setAddedSubtasks] = useState<ParsedTaskItem[]>([]);
-  const [addedTimeline, setAddedTimeline] = useState<TaskFieldsValue["timeline"]>(
-    "today",
-  );
-  const [addedSpecificDate, setAddedSpecificDate] = useState<string>("");
-  const [showEdit, setShowEdit] = useState(false);
+  // Linear queue of items to review. Rebuilt when the dump changes.
+  const [flow, setFlow] = useState<FlowItem[]>([]);
+  const [currentIdx, setCurrentIdx] = useState(0);
+
+  // Timeline picker state (applies to the current card only).
+  const [timeline, setTimeline] = useState<TaskFieldsValue["timeline"]>("today");
+  const [specificDate, setSpecificDate] = useState<string>("");
+
+  // Edit mode toggle + form state. When editing, the user modifies the
+  // current item's fields; when they Save, we update flow[currentIdx]
+  // in place. Nothing is persisted to the DB until they click Add task.
+  const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState<TaskFieldsValue | null>(null);
 
-  // Compute the queue whenever the dump changes and we're open
+  // Rebuild the flow whenever the dump changes and we open
   useEffect(() => {
     if (!open) return;
     const items = dump.parsed_items ?? [];
@@ -132,43 +143,28 @@ function ReviewFlow({ dump, open, onClose }: ReviewFlowProps) {
       ...(dump.processed_indices ?? []),
       ...(dump.skipped_indices ?? []),
     ]);
-    const remaining = items
-      .map((_, i) => i)
-      .filter((i) => !done.has(i));
-    setQueue(remaining);
+    const remaining: FlowItem[] = items
+      .map((it, i): FlowItem | null => (done.has(i) ? null : { item: it, originalIdx: i }))
+      .filter((x): x is FlowItem => x !== null);
+    setFlow(remaining);
     setCurrentIdx(0);
-    setAddedSubtasks([]);
-    setAddedTimeline("today");
-    setAddedSpecificDate("");
-    setShowEdit(false);
+    setTimeline("today");
+    setSpecificDate("");
+    setEditing(false);
     setEditValue(null);
   }, [open, dump.id, dump.parsed_at]);
 
-  const totalRemaining = queue.length + addedSubtasks.length;
+  const currentFlowItem: FlowItem | null = flow[currentIdx] ?? null;
+  const currentItem: ParsedTaskItem | null = currentFlowItem?.item ?? null;
   const positionLabel =
-    totalRemaining > 0
-      ? `${Math.min(currentIdx + 1, totalRemaining)} of ${totalRemaining}`
+    flow.length > 0
+      ? `${Math.min(currentIdx + 1, flow.length)} of ${flow.length}`
       : "Done";
 
-  // Get the current item. If we've exhausted the original queue, pull from
-  // addedSubtasks (from break-down operations). We adjust currentIdx.
-  const currentItem: ParsedTaskItem | null = useMemo(() => {
-    if (currentIdx < queue.length) {
-      const parsedIdx = queue[currentIdx];
-      return dump.parsed_items?.[parsedIdx] ?? null;
-    }
-    const subIdx = currentIdx - queue.length;
-    return addedSubtasks[subIdx] ?? null;
-  }, [currentIdx, queue, dump.parsed_items, addedSubtasks]);
-
-  // Is the current position an original parsed item (needs marking) or a
-  // spliced-in sub-task (already ephemeral)?
-  const currentIsOriginal = currentIdx < queue.length;
-  const currentOriginalIdx = currentIsOriginal ? queue[currentIdx] : null;
-
   const advance = () => {
-    if (currentIdx + 1 >= totalRemaining) {
-      // Reached the end
+    setEditing(false);
+    setEditValue(null);
+    if (currentIdx + 1 >= flow.length) {
       qc.invalidateQueries({ queryKey: ["brain_dumps"] });
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
@@ -176,40 +172,39 @@ function ReviewFlow({ dump, open, onClose }: ReviewFlowProps) {
       toast({ title: "Review done.", description: "Any skipped items are still on the dump for later." });
     } else {
       setCurrentIdx((n) => n + 1);
+      setTimeline("today");
+      setSpecificDate("");
     }
   };
 
   const commitCurrent = useMutation({
     mutationFn: async () => {
-      if (!currentItem) return;
-      // Build task input using the review timeline dropdown state
+      if (!currentFlowItem) return;
+      const it = currentFlowItem.item;
       let dueBucket: DueBucket | null = null;
       let dueDate: string | null = null;
-      if (addedTimeline === "specific_date") {
-        if (!addedSpecificDate) throw new Error("Pick a date.");
-        dueDate = addedSpecificDate;
+      if (timeline === "specific_date") {
+        if (!specificDate) throw new Error("Pick a date.");
+        dueDate = specificDate;
       } else {
-        dueBucket = addedTimeline;
+        dueBucket = timeline;
       }
       await createTask({
-        title: currentItem.title,
-        notes: currentItem.notes ?? null,
-        spoonEstimate: currentItem.spoon_estimate ?? null,
-        estimatedHours: currentItem.estimated_hours ?? null,
-        complexity: currentItem.complexity ?? null,
-        billable: currentItem.billable ?? false,
+        title: it.title,
+        notes: it.notes ?? null,
+        spoonEstimate: it.spoon_estimate ?? null,
+        estimatedHours: it.estimated_hours ?? null,
+        complexity: it.complexity ?? null,
+        billable: it.billable ?? false,
         dueBucket,
         dueDate,
       });
-      if (currentIsOriginal && currentOriginalIdx !== null) {
-        await markBrainDumpProcessed(dump.id, currentOriginalIdx);
+      // Only mark on the dump if this was an original parsed item
+      if (currentFlowItem.originalIdx !== null) {
+        await markBrainDumpProcessed(dump.id, currentFlowItem.originalIdx);
       }
     },
-    onSuccess: () => {
-      setAddedTimeline("today");
-      setAddedSpecificDate("");
-      advance();
-    },
+    onSuccess: () => advance(),
     onError: (e) => {
       toast({
         title: "Couldn't add",
@@ -220,20 +215,21 @@ function ReviewFlow({ dump, open, onClose }: ReviewFlowProps) {
 
   const skipCurrent = useMutation({
     mutationFn: async () => {
-      if (currentIsOriginal && currentOriginalIdx !== null) {
-        await markBrainDumpSkipped(dump.id, currentOriginalIdx);
+      if (!currentFlowItem) return;
+      if (currentFlowItem.originalIdx !== null) {
+        await markBrainDumpSkipped(dump.id, currentFlowItem.originalIdx);
       }
-      // Sub-tasks skipped in flow are just dropped from local state; not persisted
+      // Sub-tasks (originalIdx=null) are dropped from local state on advance()
     },
     onSuccess: () => advance(),
   });
 
   const breakDown = useMutation({
     mutationFn: async () => {
-      if (!currentItem) return [];
+      if (!currentFlowItem) return [] as ParsedTaskItem[];
       return breakDownTask({
-        title: currentItem.title,
-        notes: currentItem.notes ?? null,
+        title: currentFlowItem.item.title,
+        notes: currentFlowItem.item.notes ?? null,
       });
     },
     onSuccess: (subs) => {
@@ -244,35 +240,30 @@ function ReviewFlow({ dump, open, onClose }: ReviewFlowProps) {
         });
         return;
       }
-      // Mark the current original item as skipped (it's being replaced)
-      if (currentIsOriginal && currentOriginalIdx !== null) {
-        void markBrainDumpSkipped(dump.id, currentOriginalIdx);
+      if (!currentFlowItem) return;
+      // Mark the current original as skipped (being replaced) if applicable
+      if (currentFlowItem.originalIdx !== null) {
+        void markBrainDumpSkipped(dump.id, currentFlowItem.originalIdx);
       }
-      // Splice the sub-tasks in at the current position by prepending them
-      // to addedSubtasks. We'll adjust so the current index points to the
-      // first sub-task next.
-      setAddedSubtasks((prev) => [...subs, ...prev]);
-      // Move on: increment the currentIdx by 0 if we're already past the
-      // original queue length (we're in sub-tasks), else advance to
-      // position (queue.length) which is the first added sub-task.
-      // Simpler: just advance() and the queue position math handles it.
-      // But we need to NOT skip past the newly-inserted subs, so instead
-      // we set currentIdx to queue.length (the boundary) minus 0 if we're
-      // still in queue.
-      if (currentIsOriginal) {
-        // Advance past this original item; the next iteration lands on
-        // the sub-tasks we just spliced in front.
-        // But queue length hasn't changed. We just increment.
-        setCurrentIdx((n) => n + 1);
-      } else {
-        // Already in sub-tasks; break-down effectively replaces this one.
-        // Don't increment; the next currentItem will be the first new sub.
-        setAddedSubtasks((prev) => {
-          // Remove the current sub (the one being replaced)
-          const subIdx = currentIdx - queue.length;
-          return [...subs, ...prev.slice(0, subIdx), ...prev.slice(subIdx + 1)];
-        });
-      }
+      // REPLACE the current flow item with the new sub-items at the same
+      // position. currentIdx stays where it is so the next card shown is
+      // the first sub-task. This is the fix for the "break down did nothing"
+      // bug.
+      const newFlowItems: FlowItem[] = subs.map((s) => ({ item: s, originalIdx: null }));
+      setFlow((prev) => [
+        ...prev.slice(0, currentIdx),
+        ...newFlowItems,
+        ...prev.slice(currentIdx + 1),
+      ]);
+      // Reset edit state and timeline pick since we're on a new item
+      setEditing(false);
+      setEditValue(null);
+      setTimeline("today");
+      setSpecificDate("");
+      toast({
+        title: `Split into ${subs.length}.`,
+        description: "Review each smaller piece next.",
+      });
     },
     onError: (e) => {
       toast({
@@ -281,6 +272,60 @@ function ReviewFlow({ dump, open, onClose }: ReviewFlowProps) {
       });
     },
   });
+
+  // Enter edit mode: seed the form with the current item's AI values
+  const openEdit = () => {
+    if (!currentFlowItem) return;
+    const it = currentFlowItem.item;
+    setEditValue({
+      title: it.title,
+      notes: it.notes ?? "",
+      spoonEstimate: it.spoon_estimate != null ? String(it.spoon_estimate) : "",
+      estimatedHours:
+        it.estimated_hours != null ? String(it.estimated_hours) : "",
+      complexity: it.complexity ?? "",
+      timeline,
+      specificDate,
+      billable: it.billable ?? false,
+    });
+    setEditing(true);
+  };
+
+  // Save edits: convert form to task input, update flow[currentIdx] in place,
+  // and also propagate timeline choice back to the timeline dropdown.
+  const saveEdit = () => {
+    if (!editValue || !currentFlowItem) return;
+    const conv = fieldsToTaskInput(editValue);
+    if ("error" in conv) {
+      toast({ title: "Fix that first", description: conv.error });
+      return;
+    }
+    const updated: ParsedTaskItem = {
+      title: conv.title,
+      notes: conv.notes ?? undefined,
+      spoon_estimate: conv.spoonEstimate ?? undefined,
+      estimated_hours: conv.estimatedHours ?? undefined,
+      complexity: conv.complexity ?? undefined,
+      billable: conv.billable,
+      // Preserve the AI's break_down_hint
+      break_down_hint: currentFlowItem.item.break_down_hint,
+    };
+    setFlow((prev) =>
+      prev.map((f, i) =>
+        i === currentIdx ? { ...f, item: updated } : f,
+      ),
+    );
+    // Reflect the timeline change into the parent timeline picker state
+    setTimeline(editValue.timeline);
+    setSpecificDate(editValue.specificDate);
+    setEditing(false);
+    setEditValue(null);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setEditValue(null);
+  };
 
   if (!open || !currentItem) return null;
 
@@ -291,6 +336,9 @@ function ReviewFlow({ dump, open, onClose }: ReviewFlowProps) {
           <div className="flex items-center justify-between">
             <DialogTitle className="font-serif text-sm text-muted-foreground">
               {positionLabel}
+              {breakDown.isPending && (
+                <span className="ml-2 italic">Splitting&hellip;</span>
+              )}
             </DialogTitle>
             <button
               onClick={onClose}
@@ -303,102 +351,133 @@ function ReviewFlow({ dump, open, onClose }: ReviewFlowProps) {
           </div>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <h3 className="font-serif text-xl text-foreground">
-            {currentItem.title}
-          </h3>
-          {currentItem.notes && (
-            <p className="whitespace-pre-wrap font-serif text-sm italic text-muted-foreground">
-              {currentItem.notes}
-            </p>
-          )}
-
-          <div className="rounded-md border border-border p-3 space-y-1">
-            <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-              AI suggests
-            </p>
-            <p className="font-serif text-sm text-foreground">
-              {[
-                currentItem.spoon_estimate != null
-                  ? `${currentItem.spoon_estimate} spoons`
-                  : null,
-                currentItem.estimated_hours != null
-                  ? `${currentItem.estimated_hours}h`
-                  : null,
-                currentItem.complexity ?? null,
-                currentItem.billable ? "billable" : null,
-              ]
-                .filter(Boolean)
-                .join(" \u00b7 ")}
-            </p>
-          </div>
-
-          {currentItem.break_down_hint && (
-            <div className="rounded-md border border-amber-400/40 bg-amber-50/50 p-3">
-              <p className="text-xs italic text-amber-900 dark:text-amber-200">
-                This one might be big. Break it into smaller pieces?
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-1.5">
-            <Label htmlFor="review-timeline">Timeline</Label>
-            <select
-              id="review-timeline"
-              value={addedTimeline}
-              onChange={(e) => setAddedTimeline(e.target.value as TaskFieldsValue["timeline"])}
-              className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm"
-              data-testid="review-timeline"
-            >
-              <option value="today">Today (default)</option>
-              <option value="this_week">This week</option>
-              <option value="next_week">Next week</option>
-              <option value="this_month">This month</option>
-              <option value="this_quarter">This quarter</option>
-              <option value="later">Later</option>
-              <option value="specific_date">Pick a specific date&hellip;</option>
-            </select>
-            {addedTimeline === "specific_date" && (
-              <Input
-                type="date"
-                value={addedSpecificDate}
-                onChange={(e) => setAddedSpecificDate(e.target.value)}
-                className="mt-2"
-                data-testid="review-specific-date"
+        {editing && editValue ? (
+          <>
+            <div className="space-y-4">
+              <TaskFieldsForm
+                value={editValue}
+                onChange={setEditValue}
+                idPrefix={`review-edit`}
               />
-            )}
-          </div>
-        </div>
+            </div>
+            <DialogFooter className="flex-wrap gap-2 sm:justify-end">
+              <Button variant="ghost" size="sm" onClick={cancelEdit}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={saveEdit} data-testid="button-review-edit-save">
+                Save edits
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <div className="space-y-4">
+              <h3 className="font-serif text-xl text-foreground">
+                {currentItem.title}
+              </h3>
+              {currentItem.notes && (
+                <p className="whitespace-pre-wrap font-serif text-sm italic text-muted-foreground">
+                  {currentItem.notes}
+                </p>
+              )}
 
-        <DialogFooter className="flex-wrap gap-2 sm:justify-between">
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => breakDown.mutate()}
-              disabled={breakDown.isPending}
-              data-testid="button-review-breakdown"
-            >
-              <Split className="mr-1 h-3.5 w-3.5" />
-              Break down
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => skipCurrent.mutate()}
-              data-testid="button-review-skip"
-            >
-              Skip
-            </Button>
-          </div>
-          <Button
-            onClick={() => commitCurrent.mutate()}
-            disabled={commitCurrent.isPending}
-            data-testid="button-review-add"
-          >
-            {commitCurrent.isPending ? "Adding\u2026" : "Add task"}
-          </Button>
-        </DialogFooter>
+              <div className="rounded-md border border-border p-3 space-y-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                    AI suggests
+                  </p>
+                  <button
+                    onClick={openEdit}
+                    className="text-xs text-primary hover:underline"
+                    data-testid="button-review-edit"
+                  >
+                    Edit
+                  </button>
+                </div>
+                <p className="font-serif text-sm text-foreground">
+                  {[
+                    currentItem.spoon_estimate != null
+                      ? `${currentItem.spoon_estimate} spoons`
+                      : null,
+                    currentItem.estimated_hours != null
+                      ? `${currentItem.estimated_hours}h`
+                      : null,
+                    currentItem.complexity ?? null,
+                    currentItem.billable ? "billable" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" \u00b7 ")}
+                </p>
+              </div>
+
+              {currentItem.break_down_hint && (
+                <div className="rounded-md border border-amber-400/40 bg-amber-50/50 p-3">
+                  <p className="text-xs italic text-amber-900 dark:text-amber-200">
+                    This one might be big. Break it into smaller pieces?
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label htmlFor="review-timeline">Timeline</Label>
+                <select
+                  id="review-timeline"
+                  value={timeline}
+                  onChange={(e) => setTimeline(e.target.value as TaskFieldsValue["timeline"])}
+                  className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm"
+                  data-testid="review-timeline"
+                >
+                  <option value="today">Today (default)</option>
+                  <option value="this_week">This week</option>
+                  <option value="next_week">Next week</option>
+                  <option value="this_month">This month</option>
+                  <option value="this_quarter">This quarter</option>
+                  <option value="later">Later</option>
+                  <option value="specific_date">Pick a specific date&hellip;</option>
+                </select>
+                {timeline === "specific_date" && (
+                  <Input
+                    type="date"
+                    value={specificDate}
+                    onChange={(e) => setSpecificDate(e.target.value)}
+                    className="mt-2"
+                    data-testid="review-specific-date"
+                  />
+                )}
+              </div>
+            </div>
+
+            <DialogFooter className="flex-wrap gap-2 sm:justify-between">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => breakDown.mutate()}
+                  disabled={breakDown.isPending}
+                  data-testid="button-review-breakdown"
+                >
+                  <Split className="mr-1 h-3.5 w-3.5" />
+                  Break down
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => skipCurrent.mutate()}
+                  data-testid="button-review-skip"
+                >
+                  Skip
+                </Button>
+              </div>
+              <Button
+                onClick={() => commitCurrent.mutate()}
+                disabled={commitCurrent.isPending}
+                data-testid="button-review-add"
+              >
+                {commitCurrent.isPending ? "Adding\u2026" : "Add task"}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -630,7 +709,7 @@ export default function BrainDump() {
                 </Button>
               )}
               <p className="font-serif text-xs italic text-muted-foreground">
-                Cmd or Ctrl + Enter to save.
+                Cmd or Ctrl + Enter, or click Hold it. Same thing.
               </p>
             </div>
             <Button
