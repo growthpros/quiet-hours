@@ -25,6 +25,7 @@ import { BurnoutWave } from "@/components/burnout-wave";
 import { SpoonMeter } from "@/components/spoon-meter";
 import { PhaseSuggestionBanner } from "@/components/phase-suggestion";
 import { CheckInNudge } from "@/components/checkin-nudge";
+import { BrainDumpReviewNudge } from "@/components/braindump-review-nudge";
 import { DayNavigator, ViewingHistoryRibbon } from "@/components/day-navigator";
 import { ViewingDateProvider, useViewingDate } from "@/lib/viewing-date";
 
@@ -250,6 +251,9 @@ function TodayInner({
 
       {/* ---------- Check-in cadence nudge (today only, cadence-driven) ---------- */}
       {isToday && <CheckInNudge />}
+
+      {/* ---------- Brain Dump review nudge (today only, if any dumps have remaining items) ---------- */}
+      {isToday && <BrainDumpReviewNudge />}
 
       {/* ---------- Burnout Wave (date-aware) ---------- */}
       <BurnoutWave />

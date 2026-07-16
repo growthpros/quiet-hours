@@ -43,6 +43,8 @@ import {
   parseBrainDump,
   breakDownTask,
   createTask,
+  updateTask,
+  deleteTask,
   markBrainDumpProcessed,
   markBrainDumpSkipped,
   remainingItemCount,
@@ -115,6 +117,10 @@ interface ReviewFlowProps {
 interface FlowItem {
   item: ParsedTaskItem;
   originalIdx: number | null; // null = came from break-down, not persisted on brain_dump
+  // For break-down sub-tasks: the DB task id created when the sub-task was
+  // persisted immediately. Used so Skip on a sub-task can delete the row
+  // rather than orphaning it in Tasks.
+  taskId?: number;
 }
 
 function ReviewFlow({ dump, open, onClose }: ReviewFlowProps) {
@@ -189,19 +195,36 @@ function ReviewFlow({ dump, open, onClose }: ReviewFlowProps) {
       } else {
         dueBucket = timeline;
       }
-      await createTask({
-        title: it.title,
-        notes: it.notes ?? null,
-        spoonEstimate: it.spoon_estimate ?? null,
-        estimatedHours: it.estimated_hours ?? null,
-        complexity: it.complexity ?? null,
-        billable: it.billable ?? false,
-        dueBucket,
-        dueDate,
-      });
-      // Only mark on the dump if this was an original parsed item
-      if (currentFlowItem.originalIdx !== null) {
-        await markBrainDumpProcessed(dump.id, currentFlowItem.originalIdx);
+
+      if (currentFlowItem.taskId != null) {
+        // Sub-task from a break-down; already persisted to DB. Just update
+        // its due_bucket / due_date (and any other edits already applied to
+        // currentFlowItem.item) to reflect the user's Timeline choice.
+        await updateTask(currentFlowItem.taskId, {
+          title: it.title,
+          notes: it.notes ?? null,
+          spoonEstimate: it.spoon_estimate ?? null,
+          estimatedHours: it.estimated_hours ?? null,
+          complexity: it.complexity ?? null,
+          billable: it.billable ?? false,
+          dueBucket,
+          dueDate,
+        });
+      } else {
+        // Original parsed item: create fresh.
+        await createTask({
+          title: it.title,
+          notes: it.notes ?? null,
+          spoonEstimate: it.spoon_estimate ?? null,
+          estimatedHours: it.estimated_hours ?? null,
+          complexity: it.complexity ?? null,
+          billable: it.billable ?? false,
+          dueBucket,
+          dueDate,
+        });
+        if (currentFlowItem.originalIdx !== null) {
+          await markBrainDumpProcessed(dump.id, currentFlowItem.originalIdx);
+        }
       }
     },
     onSuccess: () => advance(),
@@ -216,23 +239,49 @@ function ReviewFlow({ dump, open, onClose }: ReviewFlowProps) {
   const skipCurrent = useMutation({
     mutationFn: async () => {
       if (!currentFlowItem) return;
-      if (currentFlowItem.originalIdx !== null) {
+      if (currentFlowItem.taskId != null) {
+        // Sub-task was auto-persisted during break-down. Skip means delete.
+        await deleteTask(currentFlowItem.taskId);
+      } else if (currentFlowItem.originalIdx !== null) {
         await markBrainDumpSkipped(dump.id, currentFlowItem.originalIdx);
       }
-      // Sub-tasks (originalIdx=null) are dropped from local state on advance()
     },
     onSuccess: () => advance(),
   });
 
   const breakDown = useMutation({
     mutationFn: async () => {
-      if (!currentFlowItem) return [] as ParsedTaskItem[];
-      return breakDownTask({
+      if (!currentFlowItem) return { subs: [] as ParsedTaskItem[] };
+      const subs = await breakDownTask({
         title: currentFlowItem.item.title,
         notes: currentFlowItem.item.notes ?? null,
       });
+      if (subs.length === 0) return { subs };
+
+      // Persist each sub-task immediately to Today bucket so they don't
+      // vanish if the user closes the review modal mid-flow. The review
+      // flow then lets the user adjust Timeline / Edit / Skip per item,
+      // and Skip becomes 'delete this sub-task' since it's already persisted.
+      const createdIds: number[] = [];
+      for (const s of subs) {
+        const created = await createTask({
+          title: s.title,
+          notes: s.notes ?? null,
+          spoonEstimate: s.spoon_estimate ?? null,
+          estimatedHours: s.estimated_hours ?? null,
+          complexity: s.complexity ?? null,
+          billable: s.billable ?? false,
+          dueBucket: "today",
+        });
+        createdIds.push(created.id);
+      }
+      // Mark the parent parsed item as processed so it's not shown again
+      if (currentFlowItem.originalIdx !== null) {
+        await markBrainDumpProcessed(dump.id, currentFlowItem.originalIdx);
+      }
+      return { subs, createdIds };
     },
-    onSuccess: (subs) => {
+    onSuccess: ({ subs, createdIds }) => {
       if (subs.length === 0) {
         toast({
           title: "Already small.",
@@ -241,28 +290,28 @@ function ReviewFlow({ dump, open, onClose }: ReviewFlowProps) {
         return;
       }
       if (!currentFlowItem) return;
-      // Mark the current original as skipped (being replaced) if applicable
-      if (currentFlowItem.originalIdx !== null) {
-        void markBrainDumpSkipped(dump.id, currentFlowItem.originalIdx);
-      }
-      // REPLACE the current flow item with the new sub-items at the same
-      // position. currentIdx stays where it is so the next card shown is
-      // the first sub-task. This is the fix for the "break down did nothing"
-      // bug.
-      const newFlowItems: FlowItem[] = subs.map((s) => ({ item: s, originalIdx: null }));
+      // Replace the current flow item with the new sub-items and their task ids.
+      // Each sub gets a taskId so Skip can delete the row rather than orphan it.
+      const newFlowItems: FlowItem[] = subs.map((s, i) => ({
+        item: s,
+        originalIdx: null,
+        taskId: createdIds?.[i],
+      }));
       setFlow((prev) => [
         ...prev.slice(0, currentIdx),
         ...newFlowItems,
         ...prev.slice(currentIdx + 1),
       ]);
-      // Reset edit state and timeline pick since we're on a new item
       setEditing(false);
       setEditValue(null);
       setTimeline("today");
       setSpecificDate("");
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
       toast({
         title: `Split into ${subs.length}.`,
-        description: "Review each smaller piece next.",
+        description:
+          "Sub-tasks added to Today. Adjust Timeline or Skip on each.",
       });
     },
     onError: (e) => {
@@ -513,6 +562,9 @@ function DumpCard({ dump }: { dump: BrainDumpRow }) {
 
   const remaining = remainingItemCount(dump);
   const hasBeenParsed = dump.parsed_at != null;
+  const totalParsed = dump.parsed_items?.length ?? 0;
+  const addedCount = (dump.processed_indices ?? []).length;
+  const skippedCount = (dump.skipped_indices ?? []).length;
 
   return (
     <>
@@ -533,6 +585,21 @@ function DumpCard({ dump }: { dump: BrainDumpRow }) {
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
+
+          {hasBeenParsed && totalParsed > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-primary">
+                {addedCount} added
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                {skippedCount} skipped
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-50/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-amber-900 dark:text-amber-200">
+                {remaining} remaining
+              </span>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <p className="text-xs italic text-muted-foreground">
               {formatRelative(dump.created_at)}
