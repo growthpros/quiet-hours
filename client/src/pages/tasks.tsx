@@ -53,8 +53,14 @@ import {
   validateRecurringPattern,
   type RecurringPatternValue,
 } from "@/components/recurring-pattern-form";
-import { createRecurringTemplate } from "@/lib/recurring-data";
+import {
+  createRecurringTemplate,
+  listRecurringTemplates,
+  describePattern,
+  type RecurringTemplateRow,
+} from "@/lib/recurring-data";
 import { resolveRecurringInstances } from "@/lib/recurring-resolver";
+import { Link } from "wouter";
 
 type Filter = "active" | "completed" | "all";
 
@@ -202,7 +208,16 @@ function CompletionPopup({ open, task, onCancel, onConfirm }: CompletionPopupPro
 
 // ---------- Task row card ----------
 
-function TaskCard({ task }: { task: TaskRow }) {
+function TaskCard({
+  task,
+  template,
+}: {
+  task: TaskRow;
+  // The parent template if this task was generated from (or adopted by)
+  // a recurring template. Null for ad-hoc tasks or orphaned instances
+  // whose template was deleted.
+  template: RecurringTemplateRow | null;
+}) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -383,21 +398,50 @@ function TaskCard({ task }: { task: TaskRow }) {
                 aria-label={done ? "Mark as active" : "Mark as complete"}
               />
               <div className="min-w-0 flex-1 space-y-1">
-                <p
-                  className={`font-serif text-base ${
-                    done
-                      ? "italic text-muted-foreground line-through decoration-muted-foreground/40"
-                      : "text-foreground"
-                  }`}
-                >
-                  {task.title}
-                </p>
+                <div className="flex items-center gap-2">
+                  {alreadyRecurring && (
+                    <Repeat
+                      className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                      aria-label="Recurring task"
+                    />
+                  )}
+                  <p
+                    className={`font-serif text-base ${
+                      done
+                        ? "italic text-muted-foreground line-through decoration-muted-foreground/40"
+                        : "text-foreground"
+                    }`}
+                  >
+                    {task.title}
+                  </p>
+                </div>
                 {task.notes && (
                   <p className="whitespace-pre-wrap font-serif text-sm italic text-muted-foreground">
                     {task.notes}
                   </p>
                 )}
                 <TaskChips task={task} />
+                {/* Recurring template pointer. Only shown for generated
+                    instances. Clicking navigates to /recurring where the
+                    user can edit or pause the template. If the template
+                    has been deleted (recurring_template_id set but no
+                    match in the map), fall back to a subtle 'Repeats' hint
+                    with no link. */}
+                {alreadyRecurring && template && (
+                  <Link
+                    href="/recurring"
+                    className="pt-0.5 text-xs italic text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    data-testid={`link-task-template-${task.id}`}
+                  >
+                    Repeats: {describePattern(template).toLowerCase()}
+                  </Link>
+                )}
+                {alreadyRecurring && !template && (
+                  <p className="pt-0.5 text-xs italic text-muted-foreground">
+                    From a repeat that was removed. This task remains as
+                    history.
+                  </p>
+                )}
                 {task.completion_reason && done && (
                   <p className="whitespace-pre-wrap pt-1 font-serif text-xs italic text-muted-foreground">
                     Reason: {task.completion_reason}
@@ -955,6 +999,17 @@ export default function Tasks() {
     queryKey: ["tasks"],
     queryFn: listTasks,
   });
+  // Load all templates once so each TaskCard can render its parent
+  // template's pattern without a per-row round trip. Small list, cached.
+  const templatesQ = useQuery<RecurringTemplateRow[]>({
+    queryKey: ["recurring-templates"],
+    queryFn: listRecurringTemplates,
+  });
+  const templatesById = useMemo(() => {
+    const map = new Map<number, RecurringTemplateRow>();
+    for (const t of templatesQ.data ?? []) map.set(t.id, t);
+    return map;
+  }, [templatesQ.data]);
 
   const filtered = useMemo(() => {
     const rows = tasksQ.data ?? [];
@@ -1010,7 +1065,15 @@ export default function Tasks() {
       ) : (
         <div className="space-y-3">
           {filtered.map((t) => (
-            <TaskCard key={t.id} task={t} />
+            <TaskCard
+              key={t.id}
+              task={t}
+              template={
+                t.recurring_template_id != null
+                  ? templatesById.get(t.recurring_template_id) ?? null
+                  : null
+              }
+            />
           ))}
         </div>
       )}
