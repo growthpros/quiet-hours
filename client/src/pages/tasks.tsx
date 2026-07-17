@@ -45,12 +45,7 @@ import {
   fieldsToTaskInput,
   type TaskFieldsValue,
 } from "@/components/task-fields-form";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { ChevronDown, Repeat } from "lucide-react";
+import { ChevronLeft, Repeat } from "lucide-react";
 import {
   RecurringPatternForm,
   defaultRecurringPatternValue,
@@ -475,16 +470,52 @@ function taskToFields(task: TaskRow): TaskFieldsValue {
 
 // ---------- New task dialog with override guard ----------
 
+// Human-readable summary of the recurring pattern for the chip that
+// appears back on the task step after the user hits Set up.
+function summarizeRecurringDraft(p: RecurringPatternValue): string {
+  const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const NTH = ["", "1st", "2nd", "3rd", "4th", "5th"];
+  switch (p.pattern_type) {
+    case "daily":
+    case "custom":
+      return p.interval_n === 1 ? "Every day" : `Every ${p.interval_n} days`;
+    case "weekly":
+      if (p.days_of_week.length === 0) {
+        return p.interval_n === 1 ? "Every week" : `Every ${p.interval_n} weeks`;
+      }
+      return `Weekly on ${[...p.days_of_week].sort().map((d) => WEEKDAY_SHORT[d]).join(", ")}`;
+    case "monthly":
+      if (p.monthly_kind === "day_of_month" && p.day_of_month) {
+        return `Monthly on day ${p.day_of_month}`;
+      }
+      if (p.monthly_kind === "nth_weekday" && p.nth_weekday && p.nth_weekday_day !== null) {
+        return `Monthly on the ${NTH[p.nth_weekday]} ${WEEKDAY_SHORT[p.nth_weekday_day]}`;
+      }
+      return "Monthly";
+  }
+}
+
+type DialogStep = "task" | "recurring";
+
 function NewTaskDialog() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<DialogStep>("task");
   const [value, setValue] = useState<TaskFieldsValue>(defaultTaskFieldsValue());
-  // Recurring section state. isRecurring controls the collapsible;
-  // pattern holds the pattern-form's value shape.
+  // Recurring state:
+  //   isRecurring = checkbox state (may be true while step='task' if the
+  //     user has configured a draft and returned to the task step)
+  //   pattern = the pattern-form's live value while on the recurring step
+  //   patternDraft = a saved copy from Set up, used to render the chip and
+  //     reopen the recurring step with the same values. null until first
+  //     Set up.
   const [isRecurring, setIsRecurring] = useState(false);
   const [pattern, setPattern] = useState<RecurringPatternValue>(
     defaultRecurringPatternValue(),
+  );
+  const [patternDraft, setPatternDraft] = useState<RecurringPatternValue | null>(
+    null,
   );
   // Narrower conv type: at set-time we've already thrown when the union
   // was in the {error} branch, so the stored value is always the success
@@ -508,7 +539,39 @@ function NewTaskDialog() {
     setValue(defaultTaskFieldsValue());
     setIsRecurring(false);
     setPattern(defaultRecurringPatternValue());
+    setPatternDraft(null);
+    setStep("task");
     setPendingOverride(null);
+  };
+
+  // Checkbox handler: toggling ON opens the recurring step so the user
+  // configures immediately. Toggling OFF drops any saved draft.
+  const toggleRecurring = (on: boolean) => {
+    setIsRecurring(on);
+    if (on) {
+      // If we have a saved draft, restore it. Otherwise start fresh with
+      // sensible defaults derived from the standard task fields (e.g.,
+      // start_date = today).
+      setPattern(patternDraft ?? defaultRecurringPatternValue());
+      setStep("recurring");
+    } else {
+      // Unchecking dumps the draft. If the user re-checks later, they
+      // start fresh. Simpler mental model than remembering across toggles.
+      setPatternDraft(null);
+      setPattern(defaultRecurringPatternValue());
+    }
+  };
+
+  // Set up button on the recurring step: validate, commit to draft,
+  // return to the task step. Nothing hits the DB yet.
+  const commitPatternDraft = () => {
+    const invalid = validateRecurringPattern(pattern);
+    if (invalid) {
+      toast({ title: "Fix this to continue", description: invalid });
+      return;
+    }
+    setPatternDraft(pattern);
+    setStep("task");
   };
 
   const persist = async (conv: {
@@ -534,13 +597,13 @@ function NewTaskDialog() {
       const conv = fieldsToTaskInput(value);
       if ("error" in conv) throw new Error(conv.error);
 
-      // Recurring path: create a template, then resolve to insert the
-      // first instance if start_date <= today. No override modal here;
-      // budget check applies to the concrete instance the resolver
-      // creates, not the template itself.
-      if (isRecurring) {
-        const invalid = validateRecurringPattern(pattern);
-        if (invalid) throw new Error(invalid);
+      // Recurring path: use the saved patternDraft (guaranteed to exist
+      // when isRecurring is true; the recurring step blocks return
+      // without a valid draft). Create the template then resolve so
+      // today's first instance appears immediately. No override modal
+      // here; budget check applies to each generated instance, not the
+      // template itself.
+      if (isRecurring && patternDraft) {
         await createRecurringTemplate({
           title: conv.title,
           notes: conv.notes,
@@ -548,17 +611,17 @@ function NewTaskDialog() {
           estimated_hours: conv.estimatedHours ?? 0.5,
           complexity: conv.complexity ?? "low",
           billable: conv.billable,
-          pattern_type: pattern.pattern_type,
-          interval_n: pattern.interval_n,
-          days_of_week: pattern.days_of_week,
-          monthly_kind: pattern.monthly_kind,
-          day_of_month: pattern.day_of_month,
-          nth_weekday: pattern.nth_weekday,
-          nth_weekday_day: pattern.nth_weekday_day,
-          start_date: pattern.start_date,
-          end_date: pattern.end_date,
-          end_after_n: pattern.end_after_n,
-          on_miss: pattern.on_miss,
+          pattern_type: patternDraft.pattern_type,
+          interval_n: patternDraft.interval_n,
+          days_of_week: patternDraft.days_of_week,
+          monthly_kind: patternDraft.monthly_kind,
+          day_of_month: patternDraft.day_of_month,
+          nth_weekday: patternDraft.nth_weekday,
+          nth_weekday_day: patternDraft.nth_weekday_day,
+          start_date: patternDraft.start_date,
+          end_date: patternDraft.end_date,
+          end_after_n: patternDraft.end_after_n,
+          on_miss: patternDraft.on_miss,
         });
         await resolveRecurringInstances();
         qc.invalidateQueries({ queryKey: ["tasks"] });
@@ -623,58 +686,94 @@ function NewTaskDialog() {
         </DialogTrigger>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-serif">Something to do</DialogTitle>
+            <DialogTitle className="font-serif flex items-center gap-2">
+              {step === "recurring" && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 -ml-1"
+                  onClick={() => setStep("task")}
+                  aria-label="Back to task"
+                  data-testid="button-recurring-back"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+              )}
+              {step === "task" ? "Something to do" : "Repeats"}
+            </DialogTitle>
           </DialogHeader>
-          <TaskFieldsForm
-            value={value}
-            onChange={setValue}
-            idPrefix="new-task"
-          />
 
-          {/* Recurring section — collapsed by default. Opening the collapsible
-              flips isRecurring so the submit path uses the template flow. */}
-          <Collapsible open={isRecurring} onOpenChange={setIsRecurring}>
-            <CollapsibleTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-muted-foreground"
-                data-testid="button-toggle-recurring"
-              >
-                <Repeat className="mr-2 h-4 w-4" />
-                <span className="font-medium">
-                  {isRecurring ? "Repeats" : "Make this repeat"}
-                </span>
-                <ChevronDown
-                  className={`ml-auto h-4 w-4 transition-transform ${
-                    isRecurring ? "rotate-180" : ""
-                  }`}
-                />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="pt-3">
-              <RecurringPatternForm value={pattern} onChange={setPattern} />
-            </CollapsibleContent>
-          </Collapsible>
+          {step === "task" ? (
+            <>
+              <TaskFieldsForm
+                value={value}
+                onChange={setValue}
+                idPrefix="new-task"
+              />
+
+              {/* Recurring checkbox. If a draft is saved, clicking the summary
+                  chip reopens the recurring step preloaded with the draft. */}
+              <div className="space-y-2 pt-1">
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={isRecurring}
+                    onCheckedChange={(v) => toggleRecurring(v === true)}
+                    data-testid="checkbox-recurring"
+                  />
+                  <Repeat className="h-4 w-4 text-muted-foreground" />
+                  <span>Repeats</span>
+                </label>
+                {isRecurring && patternDraft && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setPattern(patternDraft);
+                      setStep("recurring");
+                    }}
+                    className="h-auto py-1 pl-6 text-left text-xs italic text-muted-foreground hover:text-foreground"
+                    data-testid="button-recurring-summary"
+                  >
+                    {summarizeRecurringDraft(patternDraft)}, click to edit
+                  </Button>
+                )}
+                {isRecurring && !patternDraft && (
+                  <p className="pl-6 text-xs italic text-muted-foreground">
+                    Not yet configured. Click Repeats above to open.
+                  </p>
+                )}
+              </div>
+            </>
+          ) : (
+            <RecurringPatternForm value={pattern} onChange={setPattern} />
+          )}
 
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={() => add.mutate()}
-              disabled={add.isPending || !value.title.trim()}
-              data-testid="button-new-task-add"
-            >
-              {add.isPending
-                ? isRecurring
-                  ? "Setting up\u2026"
-                  : "Adding\u2026"
-                : isRecurring
-                  ? "Set up"
-                  : "Add"}
-            </Button>
+            {step === "task" ? (
+              <Button
+                onClick={() => add.mutate()}
+                disabled={
+                  add.isPending ||
+                  !value.title.trim() ||
+                  (isRecurring && !patternDraft)
+                }
+                data-testid="button-new-task-add"
+              >
+                {add.isPending ? "Adding\u2026" : "Add"}
+              </Button>
+            ) : (
+              <Button
+                onClick={commitPatternDraft}
+                data-testid="button-recurring-set-up"
+              >
+                Set up
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
