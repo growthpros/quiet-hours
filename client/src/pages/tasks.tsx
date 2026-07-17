@@ -45,6 +45,20 @@ import {
   fieldsToTaskInput,
   type TaskFieldsValue,
 } from "@/components/task-fields-form";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ChevronDown, Repeat } from "lucide-react";
+import {
+  RecurringPatternForm,
+  defaultRecurringPatternValue,
+  validateRecurringPattern,
+  type RecurringPatternValue,
+} from "@/components/recurring-pattern-form";
+import { createRecurringTemplate } from "@/lib/recurring-data";
+import { resolveRecurringInstances } from "@/lib/recurring-resolver";
 
 type Filter = "active" | "completed" | "all";
 
@@ -466,13 +480,34 @@ function NewTaskDialog() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState<TaskFieldsValue>(defaultTaskFieldsValue());
+  // Recurring section state. isRecurring controls the collapsible;
+  // pattern holds the pattern-form's value shape.
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [pattern, setPattern] = useState<RecurringPatternValue>(
+    defaultRecurringPatternValue(),
+  );
+  // Narrower conv type: at set-time we've already thrown when the union
+  // was in the {error} branch, so the stored value is always the success
+  // branch. Compiler can't remember that across the state hop.
+  type ConvSuccess = {
+    title: string;
+    notes: string | null;
+    spoonEstimate: number | null;
+    estimatedHours: number | null;
+    complexity: import("@/lib/tasks-data").Complexity | null;
+    dueDate: string | null;
+    dueBucket: import("@/lib/tasks-data").DueBucket | null;
+    billable: boolean;
+  };
   const [pendingOverride, setPendingOverride] = useState<null | {
     spoonsOver: number;
-    conv: ReturnType<typeof fieldsToTaskInput> & { title: string };
+    conv: ConvSuccess;
   }>(null);
 
   const resetForm = () => {
     setValue(defaultTaskFieldsValue());
+    setIsRecurring(false);
+    setPattern(defaultRecurringPatternValue());
     setPendingOverride(null);
   };
 
@@ -499,6 +534,42 @@ function NewTaskDialog() {
       const conv = fieldsToTaskInput(value);
       if ("error" in conv) throw new Error(conv.error);
 
+      // Recurring path: create a template, then resolve to insert the
+      // first instance if start_date <= today. No override modal here;
+      // budget check applies to the concrete instance the resolver
+      // creates, not the template itself.
+      if (isRecurring) {
+        const invalid = validateRecurringPattern(pattern);
+        if (invalid) throw new Error(invalid);
+        await createRecurringTemplate({
+          title: conv.title,
+          notes: conv.notes,
+          spoon_estimate: conv.spoonEstimate ?? 3,
+          estimated_hours: conv.estimatedHours ?? 0.5,
+          complexity: conv.complexity ?? "low",
+          billable: conv.billable,
+          pattern_type: pattern.pattern_type,
+          interval_n: pattern.interval_n,
+          days_of_week: pattern.days_of_week,
+          monthly_kind: pattern.monthly_kind,
+          day_of_month: pattern.day_of_month,
+          nth_weekday: pattern.nth_weekday,
+          nth_weekday_day: pattern.nth_weekday_day,
+          start_date: pattern.start_date,
+          end_date: pattern.end_date,
+          end_after_n: pattern.end_after_n,
+          on_miss: pattern.on_miss,
+        });
+        await resolveRecurringInstances();
+        qc.invalidateQueries({ queryKey: ["tasks"] });
+        qc.invalidateQueries({ queryKey: ["recurring-templates"] });
+        qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
+        setOpen(false);
+        resetForm();
+        toast({ title: "Recurring set up." });
+        return;
+      }
+
       // Only check the budget when the task lands on Today AND has spoons.
       const landsOnToday =
         conv.dueBucket === "today" ||
@@ -521,7 +592,7 @@ function NewTaskDialog() {
       if (budget > 0 && projected > budget) {
         setPendingOverride({
           spoonsOver: projected - budget,
-          conv: { ...conv, title: conv.title },
+          conv,
         });
         return;
       }
@@ -559,6 +630,34 @@ function NewTaskDialog() {
             onChange={setValue}
             idPrefix="new-task"
           />
+
+          {/* Recurring section — collapsed by default. Opening the collapsible
+              flips isRecurring so the submit path uses the template flow. */}
+          <Collapsible open={isRecurring} onOpenChange={setIsRecurring}>
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-muted-foreground"
+                data-testid="button-toggle-recurring"
+              >
+                <Repeat className="mr-2 h-4 w-4" />
+                <span className="font-medium">
+                  {isRecurring ? "Repeats" : "Make this repeat"}
+                </span>
+                <ChevronDown
+                  className={`ml-auto h-4 w-4 transition-transform ${
+                    isRecurring ? "rotate-180" : ""
+                  }`}
+                />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-3">
+              <RecurringPatternForm value={pattern} onChange={setPattern} />
+            </CollapsibleContent>
+          </Collapsible>
+
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)}>
               Cancel
@@ -568,7 +667,13 @@ function NewTaskDialog() {
               disabled={add.isPending || !value.title.trim()}
               data-testid="button-new-task-add"
             >
-              {add.isPending ? "Adding\u2026" : "Add"}
+              {add.isPending
+                ? isRecurring
+                  ? "Setting up\u2026"
+                  : "Adding\u2026"
+                : isRecurring
+                  ? "Set up"
+                  : "Add"}
             </Button>
           </DialogFooter>
         </DialogContent>

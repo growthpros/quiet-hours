@@ -231,11 +231,12 @@ export function RecurringPatternForm({ value, onChange }: Props) {
               );
             })}
           </div>
-          {value.days_of_week.length === 0 && (
-            <p className="text-xs italic text-muted-foreground">
-              If none selected, uses the start date's weekday.
-            </p>
-          )}
+          <p className="text-xs italic text-muted-foreground">
+            Week starts Sunday.
+            {value.days_of_week.length === 0
+              ? " If none selected, uses the start date's weekday."
+              : ""}
+          </p>
         </div>
       )}
 
@@ -249,78 +250,99 @@ export function RecurringPatternForm({ value, onChange }: Props) {
             }
             className="space-y-2"
           >
+            {/* Day of month row. Inputs only shown when this option is selected.
+                Radio stays clickable in either state so the user can switch back. */}
             <div className="flex items-center gap-3">
               <RadioGroupItem
                 value="day_of_month"
                 id="monthly-dom"
                 data-testid="radio-monthly-day-of-month"
               />
-              <Label htmlFor="monthly-dom" className="flex items-center gap-2">
-                On day
-                <Input
-                  type="number"
-                  min={1}
-                  max={31}
-                  value={value.day_of_month ?? ""}
-                  onChange={(e) =>
-                    onChange({
-                      ...value,
-                      day_of_month: parseInt(e.target.value || "1", 10),
-                    })
-                  }
-                  disabled={value.monthly_kind !== "day_of_month"}
-                  className="w-20"
-                  data-testid="input-day-of-month"
-                />
-                of the month
-              </Label>
+              {value.monthly_kind === "day_of_month" ? (
+                <Label htmlFor="monthly-dom" className="flex items-center gap-2">
+                  On day
+                  <Input
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={value.day_of_month ?? ""}
+                    onChange={(e) =>
+                      onChange({
+                        ...value,
+                        day_of_month: parseInt(e.target.value || "1", 10),
+                      })
+                    }
+                    className="w-20"
+                    data-testid="input-day-of-month"
+                  />
+                  of the month
+                </Label>
+              ) : (
+                <Label
+                  htmlFor="monthly-dom"
+                  className="text-muted-foreground"
+                >
+                  On a specific day of the month
+                </Label>
+              )}
             </div>
+            {/* Nth weekday row. Same pattern: inputs shown only when selected. */}
             <div className="flex items-center gap-3">
               <RadioGroupItem
                 value="nth_weekday"
                 id="monthly-nth"
                 data-testid="radio-monthly-nth-weekday"
               />
-              <Label htmlFor="monthly-nth" className="flex items-center gap-2 flex-wrap">
-                On the
-                <Select
-                  value={String(value.nth_weekday ?? 1)}
-                  onValueChange={(v) =>
-                    onChange({ ...value, nth_weekday: parseInt(v, 10) })
-                  }
-                  disabled={value.monthly_kind !== "nth_weekday"}
+              {value.monthly_kind === "nth_weekday" ? (
+                <Label
+                  htmlFor="monthly-nth"
+                  className="flex items-center gap-2 flex-wrap"
                 >
-                  <SelectTrigger className="w-24" data-testid="select-nth">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {NTH_LABELS.map((l, i) => (
-                      <SelectItem key={i} value={String(i + 1)}>
-                        {l}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={String(value.nth_weekday_day ?? 1)}
-                  onValueChange={(v) =>
-                    onChange({ ...value, nth_weekday_day: parseInt(v, 10) })
-                  }
-                  disabled={value.monthly_kind !== "nth_weekday"}
+                  On the
+                  <Select
+                    value={String(value.nth_weekday ?? 1)}
+                    onValueChange={(v) =>
+                      onChange({ ...value, nth_weekday: parseInt(v, 10) })
+                    }
+                  >
+                    <SelectTrigger className="w-24" data-testid="select-nth">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {NTH_LABELS.map((l, i) => (
+                        <SelectItem key={i} value={String(i + 1)}>
+                          {l}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={String(value.nth_weekday_day ?? 1)}
+                    onValueChange={(v) =>
+                      onChange({ ...value, nth_weekday_day: parseInt(v, 10) })
+                    }
+                  >
+                    <SelectTrigger className="w-28" data-testid="select-nth-day">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WEEKDAY_FULL.map((l, i) => (
+                        <SelectItem key={i} value={String(i)}>
+                          {l}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  of the month
+                </Label>
+              ) : (
+                <Label
+                  htmlFor="monthly-nth"
+                  className="text-muted-foreground"
                 >
-                  <SelectTrigger className="w-28" data-testid="select-nth-day">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {WEEKDAY_FULL.map((l, i) => (
-                      <SelectItem key={i} value={String(i)}>
-                        {l}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                of the month
-              </Label>
+                  On the Nth weekday of the month
+                </Label>
+              )}
             </div>
           </RadioGroup>
         </div>

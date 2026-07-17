@@ -71,7 +71,7 @@ export const PATTERN_LABEL: Record<RecurringPatternType, string> = {
 export const ON_MISS_LABEL: Record<RecurringOnMiss, string> = {
   let_it_go: "Let it go",
   ask_me: "Ask me",
-  always_roll: "Always roll to today",
+  always_roll: "Always roll into today",
 };
 
 export const ON_MISS_DESCRIPTION: Record<RecurringOnMiss, string> = {

@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from "@/components/auth-provider";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { rollOverPreviousTodayTasks } from "@/lib/tasks-data";
+import { resolveRecurringInstances } from "@/lib/recurring-resolver";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BottomNav } from "@/components/bottom-nav";
 import { SiteFooter } from "@/components/site-footer";
@@ -82,9 +83,9 @@ function AuthGate() {
   const { session, loading } = useAuth();
   const qc = useQueryClient();
 
-  // On sign-in, roll any incomplete 'today' tasks from previous days
-  // forward. Runs once per session. Idempotent server-side, so retries
-  // are safe.
+  // On sign-in: roll incomplete 'today' tasks forward, then resolve
+  // recurring templates to generate any due instances. Both are
+  // idempotent; safe to retry on every mount.
   useEffect(() => {
     if (!session) return;
     void (async () => {
@@ -95,9 +96,23 @@ function AuthGate() {
           qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
         }
       } catch (e) {
-        // Non-fatal, don't block sign-in.
         // eslint-disable-next-line no-console
         console.warn("[rollover] failed", e);
+      }
+
+      try {
+        const result = await resolveRecurringInstances();
+        if (result.instancesCreated > 0) {
+          qc.invalidateQueries({ queryKey: ["tasks"] });
+          qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
+        }
+        if (result.errors.length > 0) {
+          // eslint-disable-next-line no-console
+          console.warn("[recurring-resolver] partial errors", result.errors);
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn("[recurring-resolver] failed", e);
       }
     })();
   }, [session?.user.id]); // eslint-disable-line react-hooks/exhaustive-deps
