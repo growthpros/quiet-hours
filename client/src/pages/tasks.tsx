@@ -33,6 +33,7 @@ import {
   deleteTask,
   committedSpoonsFromTasks,
   breakDownTask,
+  linkTaskToRecurringTemplate,
   DUE_BUCKET_LABEL,
   type TaskRow,
 } from "@/lib/tasks-data";
@@ -45,7 +46,7 @@ import {
   fieldsToTaskInput,
   type TaskFieldsValue,
 } from "@/components/task-fields-form";
-import { ChevronLeft, Repeat } from "lucide-react";
+import { ChevronLeft, Repeat, RefreshCw } from "lucide-react";
 import {
   RecurringPatternForm,
   defaultRecurringPatternValue,
@@ -210,6 +211,12 @@ function TaskCard({ task }: { task: TaskRow }) {
   );
   const [completing, setCompleting] = useState(false);
   const [breakingDown, setBreakingDown] = useState(false);
+  const [makingRecurring, setMakingRecurring] = useState(false);
+
+  // True if this task is already an instance of a recurring template.
+  // In that case we hide the Make Recurring button (it makes no sense
+  // to convert a generated instance into yet another template).
+  const alreadyRecurring = task.recurring_template_id !== null;
 
   const done = task.completed_at != null;
   const hasEstimatedHours = task.estimated_hours != null;
@@ -411,6 +418,18 @@ function TaskCard({ task }: { task: TaskRow }) {
                     <Split className="h-4 w-4" />
                   </Button>
                 )}
+                {!done && !alreadyRecurring && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setMakingRecurring(true)}
+                    aria-label="Make this repeat"
+                    title="Make this repeat on a schedule"
+                    data-testid={`button-task-make-recurring-${task.id}`}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   size="icon"
                   variant="ghost"
@@ -447,7 +466,127 @@ function TaskCard({ task }: { task: TaskRow }) {
           toggle.mutate({ actualHours, reason });
         }}
       />
+
+      <MakeRecurringDialog
+        open={makingRecurring}
+        task={task}
+        onClose={() => setMakingRecurring(false)}
+      />
     </>
+  );
+}
+
+// ---------- MakeRecurringDialog: convert an existing task to recurring ----------
+
+// Reuses the same visual two-step pattern as the New Task dialog. The
+// difference: task fields are already set (they belong to the existing
+// task row), so Step 1 is the pattern configuration directly, framed by
+// a title referencing the task.
+//
+// On Set up:
+//   1. Create a recurring_task_templates row with the task's title,
+//      notes, spoons, hours, complexity, billable copied in.
+//   2. Adopt the existing task as the template's first instance by
+//      setting tasks.recurring_template_id to the new template's id
+//      (unique (template_id, due_date) index prevents duplicate).
+//   3. Also update template's last_generated_for and
+//      occurrences_generated so the resolver doesn't try to insert
+//      today's instance again.
+//   4. Run the resolver for any future dates.
+
+function MakeRecurringDialog({
+  open,
+  task,
+  onClose,
+}: {
+  open: boolean;
+  task: TaskRow;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [pattern, setPattern] = useState<RecurringPatternValue>(() =>
+    // Default: daily starting today, with sensible on_miss.
+    defaultRecurringPatternValue(),
+  );
+
+  const setUp = useMutation({
+    mutationFn: async () => {
+      const invalid = validateRecurringPattern(pattern);
+      if (invalid) throw new Error(invalid);
+
+      // Adoption strategy: if task has a due_date, use it as start_date
+      // so the task IS the first instance. Otherwise use pattern's
+      // start_date as given.
+      const startDate = task.due_date ?? pattern.start_date;
+
+      const template = await createRecurringTemplate({
+        title: task.title,
+        notes: task.notes,
+        spoon_estimate: task.spoon_estimate ?? 3,
+        estimated_hours: task.estimated_hours ?? 0.5,
+        complexity: task.complexity ?? "low",
+        billable: task.billable,
+        pattern_type: pattern.pattern_type,
+        interval_n: pattern.interval_n,
+        days_of_week: pattern.days_of_week,
+        monthly_kind: pattern.monthly_kind,
+        day_of_month: pattern.day_of_month,
+        nth_weekday: pattern.nth_weekday,
+        nth_weekday_day: pattern.nth_weekday_day,
+        start_date: startDate,
+        end_date: pattern.end_date,
+        end_after_n: pattern.end_after_n,
+        on_miss: pattern.on_miss,
+      });
+
+      // Adopt this task as the first instance so we don't duplicate today
+      // when the resolver runs.
+      await linkTaskToRecurringTemplate(task.id, template.id);
+
+      // Resolve future instances (in the current window, likely just
+      // increments last_generated_for; won't insert a duplicate row for
+      // today thanks to the unique index).
+      await resolveRecurringInstances();
+
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: ["recurring-templates"] });
+    },
+    onSuccess: () => {
+      onClose();
+      toast({ title: "Recurring set up." });
+    },
+    onError: (e) => {
+      toast({
+        title: "Couldn't set up recurring",
+        description: e instanceof Error ? e.message : String(e),
+      });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="font-serif">
+            Make “{task.title}” repeat
+          </DialogTitle>
+        </DialogHeader>
+        <RecurringPatternForm value={pattern} onChange={setPattern} />
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => setUp.mutate()}
+            disabled={setUp.isPending}
+            data-testid="button-make-recurring-set-up"
+          >
+            {setUp.isPending ? "Setting up\u2026" : "Set up"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

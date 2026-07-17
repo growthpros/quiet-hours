@@ -41,6 +41,9 @@ export interface TaskRow {
   completion_reason: string | null;
   rolled_from_date: string | null;
   completed_at: number | null;
+  // Non-null when this task was generated from a recurring template OR
+  // adopted as a template's first instance via Make Recurring.
+  recurring_template_id: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -323,6 +326,20 @@ export async function breakDownTask(input: {
     throw new Error(String((data as { error: unknown }).error));
   }
   return Array.isArray(data?.items) ? (data.items as ParsedTaskItem[]) : [];
+}
+
+// Link an existing task to a recurring template as its first instance.
+// Used by the Make-Recurring flow so the current task adopts the template
+// rather than creating a duplicate row for today.
+export async function linkTaskToRecurringTemplate(
+  taskId: number,
+  templateId: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from("tasks")
+    .update({ recurring_template_id: templateId })
+    .eq("id", taskId);
+  if (error) throw error;
 }
 
 // Mark specific parsed_items as processed (i.e. promoted to a real task).
