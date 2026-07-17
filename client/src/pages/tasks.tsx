@@ -544,21 +544,30 @@ function NewTaskDialog() {
     setPendingOverride(null);
   };
 
-  // Checkbox handler: toggling ON opens the recurring step so the user
-  // configures immediately. Toggling OFF drops any saved draft.
+  // Checkbox handler. Keeps checkbox semantics clean:
+  //  - Unchecked -> checked: if there's no draft yet, opens Step 2 to
+  //    configure. If a draft already exists (rare, only from an Edit
+  //    round-trip), just marks isRecurring true and stays on task step.
+  //  - Checked -> unchecked: drops the draft entirely. Re-checking
+  //    later starts fresh. Simpler mental model.
   const toggleRecurring = (on: boolean) => {
     setIsRecurring(on);
     if (on) {
-      // If we have a saved draft, restore it. Otherwise start fresh with
-      // sensible defaults derived from the standard task fields (e.g.,
-      // start_date = today).
-      setPattern(patternDraft ?? defaultRecurringPatternValue());
-      setStep("recurring");
+      if (!patternDraft) {
+        setPattern(defaultRecurringPatternValue());
+        setStep("recurring");
+      }
     } else {
-      // Unchecking dumps the draft. If the user re-checks later, they
-      // start fresh. Simpler mental model than remembering across toggles.
       setPatternDraft(null);
       setPattern(defaultRecurringPatternValue());
+    }
+  };
+
+  // Edit link handler: reopens Step 2 preloaded with the saved draft.
+  const editPatternDraft = () => {
+    if (patternDraft) {
+      setPattern(patternDraft);
+      setStep("recurring");
     }
   };
 
@@ -725,24 +734,29 @@ function NewTaskDialog() {
                   <span>Repeats</span>
                 </label>
                 {isRecurring && patternDraft && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setPattern(patternDraft);
-                      setStep("recurring");
-                    }}
-                    className="h-auto py-1 pl-6 text-left text-xs italic text-muted-foreground hover:text-foreground"
-                    data-testid="button-recurring-summary"
-                  >
-                    {summarizeRecurringDraft(patternDraft)}, click to edit
-                  </Button>
+                  <div className="pl-6 text-xs italic text-muted-foreground">
+                    <span data-testid="text-recurring-summary">
+                      {summarizeRecurringDraft(patternDraft)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={editPatternDraft}
+                      className="ml-2 not-italic underline underline-offset-2 hover:text-foreground"
+                      data-testid="button-recurring-edit"
+                    >
+                      Edit
+                    </button>
+                  </div>
                 )}
                 {isRecurring && !patternDraft && (
-                  <p className="pl-6 text-xs italic text-muted-foreground">
-                    Not yet configured. Click Repeats above to open.
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setStep("recurring")}
+                    className="pl-6 text-xs italic text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    data-testid="button-recurring-configure"
+                  >
+                    Not yet configured. Set up.
+                  </button>
                 )}
               </div>
             </>
