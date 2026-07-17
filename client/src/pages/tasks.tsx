@@ -62,7 +62,26 @@ import {
 import { resolveRecurringInstances } from "@/lib/recurring-resolver";
 import { Link } from "wouter";
 
-type Filter = "active" | "completed" | "all";
+type Filter = "active" | "missed" | "completed" | "all";
+type MissedSubFilter = "all" | "recurring" | "non_recurring";
+
+// Returns today's date as YYYY-MM-DD in the user's local timezone.
+function todayIsoLocal(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// A task is "missed" when it's incomplete AND its due_date is strictly
+// before today. Tasks with no due_date are never missed (they're just
+// undated todos). Applies to both recurring and non-recurring tasks.
+function isMissed(task: TaskRow, todayIso: string): boolean {
+  if (task.completed_at != null) return false;
+  if (!task.due_date) return false;
+  return task.due_date < todayIso;
+}
 
 // ---------- Task summary chips (below title, when values are present) ----------
 
@@ -1011,16 +1030,36 @@ export default function Tasks() {
     return map;
   }, [templatesQ.data]);
 
+  const [missedSub, setMissedSub] = useState<MissedSubFilter>("all");
+  const today = todayIsoLocal();
+
   const filtered = useMemo(() => {
     const rows = tasksQ.data ?? [];
-    if (filter === "active") return rows.filter((r) => r.completed_at == null);
+    if (filter === "active") {
+      // Active excludes missed items so the Active list stays honest.
+      // If you didn't do yesterday's task, it moves to Missed at midnight;
+      // it doesn't clutter today's working list.
+      return rows.filter((r) => r.completed_at == null && !isMissed(r, today));
+    }
+    if (filter === "missed") {
+      const missed = rows.filter((r) => isMissed(r, today));
+      if (missedSub === "recurring") {
+        return missed.filter((r) => r.recurring_template_id != null);
+      }
+      if (missedSub === "non_recurring") {
+        return missed.filter((r) => r.recurring_template_id == null);
+      }
+      return missed;
+    }
     if (filter === "completed") return rows.filter((r) => r.completed_at != null);
     return rows;
-  }, [tasksQ.data, filter]);
+  }, [tasksQ.data, filter, missedSub, today]);
 
   const activeCount = (tasksQ.data ?? []).filter(
-    (r) => r.completed_at == null,
+    (r) => r.completed_at == null && !isMissed(r, today),
   ).length;
+  const missedCount = (tasksQ.data ?? []).filter((r) => isMissed(r, today))
+    .length;
   const completedCount = (tasksQ.data ?? []).filter(
     (r) => r.completed_at != null,
   ).length;
@@ -1041,6 +1080,12 @@ export default function Tasks() {
             testid="filter-active"
           />
           <FilterButton
+            label={`Missed (${missedCount})`}
+            active={filter === "missed"}
+            onClick={() => setFilter("missed")}
+            testid="filter-missed"
+          />
+          <FilterButton
             label={`Done (${completedCount})`}
             active={filter === "completed"}
             onClick={() => setFilter("completed")}
@@ -1055,6 +1100,37 @@ export default function Tasks() {
         </div>
         <NewTaskDialog />
       </div>
+
+      {/* Missed sub-filter: recurring / non-recurring / all. Shown only
+          when the Missed tab is active. Notice, don't grade. */}
+      {filter === "missed" && missedCount > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Show</span>
+          <div className="flex items-center gap-1 rounded-md border border-border p-1">
+            <MissedSubButton
+              label="All"
+              active={missedSub === "all"}
+              onClick={() => setMissedSub("all")}
+              testid="missed-sub-all"
+            />
+            <MissedSubButton
+              label="Recurring only"
+              active={missedSub === "recurring"}
+              onClick={() => setMissedSub("recurring")}
+              testid="missed-sub-recurring"
+            />
+            <MissedSubButton
+              label="Non-recurring only"
+              active={missedSub === "non_recurring"}
+              onClick={() => setMissedSub("non_recurring")}
+              testid="missed-sub-non-recurring"
+            />
+          </div>
+          <p className="italic text-muted-foreground">
+            Check any off if you did them but forgot to note it.
+          </p>
+        </div>
+      )}
 
       {tasksQ.isLoading ? (
         <p className="font-serif text-sm italic text-muted-foreground">
@@ -1107,10 +1183,38 @@ function FilterButton({
   );
 }
 
+function MissedSubButton({
+  label,
+  active,
+  onClick,
+  testid,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  testid: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded px-2 py-1 text-xs transition ${
+        active
+          ? "bg-primary text-primary-foreground"
+          : "text-muted-foreground hover:bg-muted"
+      }`}
+      data-testid={testid}
+    >
+      {label}
+    </button>
+  );
+}
+
 function EmptyState({ filter }: { filter: Filter }) {
   const msg =
     filter === "active"
       ? "Nothing on the list. Add one small next thing when you're ready."
+      : filter === "missed"
+      ? "Nothing missed. If something slipped past a due date, it will land here quietly."
       : filter === "completed"
       ? "No completed tasks yet. Something will land here soon."
       : "No tasks yet. Add one when you're ready.";
