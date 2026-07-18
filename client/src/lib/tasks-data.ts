@@ -41,6 +41,13 @@ export interface TaskRow {
   completion_reason: string | null;
   rolled_from_date: string | null;
   completed_at: number | null;
+  // Non-null when this task was generated from a recurring template OR
+  // adopted as a template's first instance via Make Recurring.
+  recurring_template_id: number | null;
+  // Non-null when the user has 'let it go' / archived this row. The task
+  // stays in the DB for reports, but is filtered out of the Tasks page
+  // by default.
+  archived_at: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -140,6 +147,11 @@ export interface UpdateTaskPatch {
   projectId?: number | null;
   completionReason?: string | null;
   completed?: boolean;
+  // Optional override for completed_at when marking complete. Used by
+  // the backdate-on-completion picker so 'I did this yesterday but
+  // forgot to check the box' honors yesterday's date. Milliseconds
+  // since epoch. Only applied when completed=true and this is set.
+  completedAtOverride?: number;
 }
 
 export async function updateTask(
@@ -163,7 +175,9 @@ export async function updateTask(
   if (patch.completionReason !== undefined)
     dbPatch.completion_reason = patch.completionReason;
   if (patch.completed !== undefined) {
-    dbPatch.completed_at = patch.completed ? Date.now() : null;
+    dbPatch.completed_at = patch.completed
+      ? patch.completedAtOverride ?? Date.now()
+      : null;
   }
 
   const { data, error } = await supabase
@@ -325,6 +339,55 @@ export async function breakDownTask(input: {
   return Array.isArray(data?.items) ? (data.items as ParsedTaskItem[]) : [];
 }
 
+// Archive ("let it go") a task. Non-destructive; the row keeps all its
+// data. archived_at gets a timestamp; downstream views filter it out
+// of the Tasks page but include it in reports.
+export async function archiveTask(taskId: number): Promise<void> {
+  const { error } = await supabase
+    .from("tasks")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", taskId);
+  if (error) throw error;
+}
+
+// Undo archive. Rare, but useful for a mistake tap.
+export async function unarchiveTask(taskId: number): Promise<void> {
+  const { error } = await supabase
+    .from("tasks")
+    .update({ archived_at: null })
+    .eq("id", taskId);
+  if (error) throw error;
+}
+
+// Move a task to today. Sets due_date=today and due_bucket='today'.
+// Used from the Missed filter's inline action.
+export async function moveTaskToToday(taskId: number): Promise<void> {
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, "0");
+  const d = String(today.getDate()).padStart(2, "0");
+  const iso = `${y}-${m}-${d}`;
+  const { error } = await supabase
+    .from("tasks")
+    .update({ due_date: iso, due_bucket: "today" })
+    .eq("id", taskId);
+  if (error) throw error;
+}
+
+// Link an existing task to a recurring template as its first instance.
+// Used by the Make-Recurring flow so the current task adopts the template
+// rather than creating a duplicate row for today.
+export async function linkTaskToRecurringTemplate(
+  taskId: number,
+  templateId: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from("tasks")
+    .update({ recurring_template_id: templateId })
+    .eq("id", taskId);
+  if (error) throw error;
+}
+
 // Mark specific parsed_items as processed (i.e. promoted to a real task).
 // Also clears it from skipped_indices if present, so a user reviewing
 // skipped items can un-skip them and commit as a task.
@@ -394,6 +457,19 @@ export function remainingItemCount(dump: BrainDumpRow): number {
 // the start of the current local day forward. Idempotent: sets
 // rolled_from_date to yesterday's date the first time we see the task on
 // a new day; won't double-roll within the same day.
+//
+// Session 3.3 change: recurring instances are EXCLUDED from rollover.
+// Their date matters for reporting (History tab, Missed filter, Ask-me
+// prompt) and their on_miss policy controls what happens when they're
+// left incomplete:
+//   - let_it_go: stays on its original date as a Not Completed history row
+//   - ask_me: surfaces in the MissedRecurringPrompt on Today
+//   - always_roll: the resolver rewrites due_date=today when generating
+//                  the next scheduled instance, so it never needs the
+//                  Session 3.2 rollover path
+// A recurring instance's date is its identity; rolling it forward would
+// corrupt the (recurring_template_id, due_date) unique index the moment
+// today's fresh instance gets inserted by the resolver.
 export async function rollOverPreviousTodayTasks(): Promise<number> {
   const now = new Date();
   const startOfToday = new Date(now);
@@ -404,7 +480,8 @@ export async function rollOverPreviousTodayTasks(): Promise<number> {
 
   // Find incomplete tasks in 'today' bucket whose updated_at is before
   // startOfToday AND whose rolled_from_date isn't already yyyyMmDdYesterday
-  // (defensive against double-rolls if the client fires twice).
+  // (defensive against double-rolls if the client fires twice). Skips
+  // any row belonging to a recurring template.
   const { data, error } = await supabase
     .from("tasks")
     .update({
@@ -412,6 +489,7 @@ export async function rollOverPreviousTodayTasks(): Promise<number> {
       updated_at: Date.now(),
     })
     .is("completed_at", null)
+    .is("recurring_template_id", null)
     .eq("due_bucket", "today")
     .lt("updated_at", startOfToday.getTime())
     .neq("rolled_from_date", yyyyMmDdYesterday)
