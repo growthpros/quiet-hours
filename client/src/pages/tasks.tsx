@@ -22,6 +22,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,8 +41,11 @@ import {
   committedSpoonsFromTasks,
   breakDownTask,
   linkTaskToRecurringTemplate,
+  archiveTask,
+  moveTaskToToday,
   DUE_BUCKET_LABEL,
   type TaskRow,
+  type DueBucket,
 } from "@/lib/tasks-data";
 import { getOrCreateTodayLedger } from "@/lib/spoon-data";
 import { OverrideModal } from "@/components/override-modal";
@@ -64,6 +74,7 @@ import { Link } from "wouter";
 
 type Filter = "active" | "missed" | "completed" | "all";
 type MissedSubFilter = "all" | "recurring" | "non_recurring";
+type TimeframeFilter = "all" | "today" | "this_week" | "this_month";
 
 // Returns today's date as YYYY-MM-DD in the user's local timezone.
 function todayIsoLocal(): string {
@@ -74,14 +85,78 @@ function todayIsoLocal(): string {
   return `${y}-${m}-${day}`;
 }
 
-// A task is "missed" when it's incomplete AND its due_date is strictly
-// before today. Tasks with no due_date are never missed (they're just
-// undated todos). Applies to both recurring and non-recurring tasks.
+// Missed = task is incomplete AND is on a date that has already passed.
+// Per Session 3.3 decision (Option B):
+//   - Recurring instances with due_date < today are ALWAYS missed. Their
+//     on_miss policy determines what happens next (let_it_go: stays here;
+//     ask_me: prompt user; always_roll: resolver rewrote it to today so
+//     it never reaches this state).
+//   - Non-recurring tasks are missed ONLY if they have a specific past
+//     due_date AND due_bucket != 'today'. Tasks marked with due_bucket=
+//     'today' get rolled forward by Session 3.2's rollover at midnight,
+//     so they never accumulate here.
 function isMissed(task: TaskRow, todayIso: string): boolean {
   if (task.completed_at != null) return false;
   if (!task.due_date) return false;
-  return task.due_date < todayIso;
+  if (task.due_date >= todayIso) return false;
+  if (task.recurring_template_id != null) return true;
+  // Non-recurring past-due task: only counted missed if it was pinned to
+  // a specific date, not the movable today bucket.
+  return task.due_bucket !== "today";
 }
+
+// Timeframe filter for Active view. Uses due_date + due_bucket. Buckets
+// map roughly to the same ranges Session 4 will use.
+function matchesTimeframe(
+  task: TaskRow,
+  tf: TimeframeFilter,
+  todayIso: string,
+): boolean {
+  if (tf === "all") return true;
+  const today = new Date(todayIso + "T00:00:00");
+  const dueDate = task.due_date
+    ? new Date(task.due_date + "T00:00:00")
+    : null;
+
+  if (tf === "today") {
+    if (task.due_bucket === "today") return true;
+    return dueDate?.getTime() === today.getTime();
+  }
+  if (tf === "this_week") {
+    if (task.due_bucket === "today" || task.due_bucket === "this_week") {
+      return true;
+    }
+    if (!dueDate) return false;
+    const endOfWeek = new Date(today);
+    // End-of-week = following Saturday. Week starts Sunday per app's
+    // convention.
+    endOfWeek.setDate(today.getDate() + (6 - today.getDay()));
+    return dueDate >= today && dueDate <= endOfWeek;
+  }
+  if (tf === "this_month") {
+    if (
+      task.due_bucket === "today" ||
+      task.due_bucket === "this_week" ||
+      task.due_bucket === "this_month"
+    ) {
+      return true;
+    }
+    if (!dueDate) return false;
+    return (
+      dueDate.getFullYear() === today.getFullYear() &&
+      dueDate.getMonth() === today.getMonth() &&
+      dueDate >= today
+    );
+  }
+  return true;
+}
+
+const TIMEFRAME_LABEL: Record<TimeframeFilter, string> = {
+  all: "Any time",
+  today: "Today",
+  this_week: "This week",
+  this_month: "This month",
+};
 
 // ---------- Task summary chips (below title, when values are present) ----------
 
@@ -230,12 +305,19 @@ function CompletionPopup({ open, task, onCancel, onConfirm }: CompletionPopupPro
 function TaskCard({
   task,
   template,
+  showMissedActions,
+  showLetGoAction,
 }: {
   task: TaskRow;
   // The parent template if this task was generated from (or adopted by)
   // a recurring template. Null for ad-hoc tasks or orphaned instances
   // whose template was deleted.
   template: RecurringTemplateRow | null;
+  // Shown only when the current filter is Missed: inline 'Move to today'
+  // and 'Let it go' actions.
+  showMissedActions?: boolean;
+  // Shown when the current filter is Done: inline 'Let it go' action.
+  showLetGoAction?: boolean;
 }) {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -301,6 +383,39 @@ function TaskCard({
     onError: (e) => {
       toast({
         title: "Couldn't save",
+        description: e instanceof Error ? e.message : String(e),
+      });
+    },
+  });
+
+  const archive = useMutation({
+    mutationFn: async () => archiveTask(task.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
+      toast({
+        title: "Let go.",
+        description: "Still saved for reports.",
+      });
+    },
+    onError: (e) => {
+      toast({
+        title: "Couldn't let it go",
+        description: e instanceof Error ? e.message : String(e),
+      });
+    },
+  });
+
+  const moveToToday = useMutation({
+    mutationFn: async () => moveTaskToToday(task.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
+      toast({ title: "Moved to today." });
+    },
+    onError: (e) => {
+      toast({
+        title: "Couldn't move",
         description: e instanceof Error ? e.message : String(e),
       });
     },
@@ -465,6 +580,44 @@ function TaskCard({
                   <p className="whitespace-pre-wrap pt-1 font-serif text-xs italic text-muted-foreground">
                     Reason: {task.completion_reason}
                   </p>
+                )}
+                {/* Missed-row inline actions. Muted text buttons keep the
+                    row visually calm; no red, no urgency. */}
+                {showMissedActions && (
+                  <div className="flex flex-wrap items-center gap-3 pt-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => moveToToday.mutate()}
+                      disabled={moveToToday.isPending}
+                      className="italic text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+                      data-testid={`button-task-move-today-${task.id}`}
+                    >
+                      Move to today
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => archive.mutate()}
+                      disabled={archive.isPending}
+                      className="italic text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+                      data-testid={`button-task-let-go-${task.id}`}
+                    >
+                      Let it go
+                    </button>
+                  </div>
+                )}
+                {/* Done-row 'Let it go' action. Same word for consistency. */}
+                {showLetGoAction && !showMissedActions && (
+                  <div className="pt-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => archive.mutate()}
+                      disabled={archive.isPending}
+                      className="italic text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+                      data-testid={`button-task-archive-${task.id}`}
+                    >
+                      Let it go
+                    </button>
+                  </div>
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -1031,18 +1184,24 @@ export default function Tasks() {
   }, [templatesQ.data]);
 
   const [missedSub, setMissedSub] = useState<MissedSubFilter>("all");
+  const [timeframe, setTimeframe] = useState<TimeframeFilter>("all");
   const today = todayIsoLocal();
 
+  // Archived rows never appear in the Tasks page. They live for reports.
+  const nonArchivedRows = useMemo(
+    () => (tasksQ.data ?? []).filter((r) => r.archived_at == null),
+    [tasksQ.data],
+  );
+
   const filtered = useMemo(() => {
-    const rows = tasksQ.data ?? [];
     if (filter === "active") {
-      // Active excludes missed items so the Active list stays honest.
-      // If you didn't do yesterday's task, it moves to Missed at midnight;
-      // it doesn't clutter today's working list.
-      return rows.filter((r) => r.completed_at == null && !isMissed(r, today));
+      const active = nonArchivedRows.filter(
+        (r) => r.completed_at == null && !isMissed(r, today),
+      );
+      return active.filter((r) => matchesTimeframe(r, timeframe, today));
     }
     if (filter === "missed") {
-      const missed = rows.filter((r) => isMissed(r, today));
+      const missed = nonArchivedRows.filter((r) => isMissed(r, today));
       if (missedSub === "recurring") {
         return missed.filter((r) => r.recurring_template_id != null);
       }
@@ -1051,16 +1210,17 @@ export default function Tasks() {
       }
       return missed;
     }
-    if (filter === "completed") return rows.filter((r) => r.completed_at != null);
-    return rows;
-  }, [tasksQ.data, filter, missedSub, today]);
+    if (filter === "completed") {
+      return nonArchivedRows.filter((r) => r.completed_at != null);
+    }
+    return nonArchivedRows;
+  }, [nonArchivedRows, filter, missedSub, timeframe, today]);
 
-  const activeCount = (tasksQ.data ?? []).filter(
+  const activeCount = nonArchivedRows.filter(
     (r) => r.completed_at == null && !isMissed(r, today),
   ).length;
-  const missedCount = (tasksQ.data ?? []).filter((r) => isMissed(r, today))
-    .length;
-  const completedCount = (tasksQ.data ?? []).filter(
+  const missedCount = nonArchivedRows.filter((r) => isMissed(r, today)).length;
+  const completedCount = nonArchivedRows.filter(
     (r) => r.completed_at != null,
   ).length;
 
@@ -1100,6 +1260,32 @@ export default function Tasks() {
         </div>
         <NewTaskDialog />
       </div>
+
+      {/* Timeframe select, only shown when Active is the current filter.
+          Session 4 will replace this with the calendar/planner view. */}
+      {filter === "active" && (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Show due</span>
+          <Select
+            value={timeframe}
+            onValueChange={(v) => setTimeframe(v as TimeframeFilter)}
+          >
+            <SelectTrigger
+              className="h-8 w-40"
+              data-testid="select-timeframe"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(TIMEFRAME_LABEL) as TimeframeFilter[]).map((t) => (
+                <SelectItem key={t} value={t}>
+                  {TIMEFRAME_LABEL[t]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Missed sub-filter: recurring / non-recurring / all. Shown only
           when the Missed tab is active. Notice, don't grade. */}
@@ -1149,6 +1335,8 @@ export default function Tasks() {
                   ? templatesById.get(t.recurring_template_id) ?? null
                   : null
               }
+              showMissedActions={filter === "missed"}
+              showLetGoAction={filter === "completed" || filter === "all"}
             />
           ))}
         </div>

@@ -44,6 +44,10 @@ export interface TaskRow {
   // Non-null when this task was generated from a recurring template OR
   // adopted as a template's first instance via Make Recurring.
   recurring_template_id: number | null;
+  // Non-null when the user has 'let it go' / archived this row. The task
+  // stays in the DB for reports, but is filtered out of the Tasks page
+  // by default.
+  archived_at: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -326,6 +330,41 @@ export async function breakDownTask(input: {
     throw new Error(String((data as { error: unknown }).error));
   }
   return Array.isArray(data?.items) ? (data.items as ParsedTaskItem[]) : [];
+}
+
+// Archive ("let it go") a task. Non-destructive; the row keeps all its
+// data. archived_at gets a timestamp; downstream views filter it out
+// of the Tasks page but include it in reports.
+export async function archiveTask(taskId: number): Promise<void> {
+  const { error } = await supabase
+    .from("tasks")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", taskId);
+  if (error) throw error;
+}
+
+// Undo archive. Rare, but useful for a mistake tap.
+export async function unarchiveTask(taskId: number): Promise<void> {
+  const { error } = await supabase
+    .from("tasks")
+    .update({ archived_at: null })
+    .eq("id", taskId);
+  if (error) throw error;
+}
+
+// Move a task to today. Sets due_date=today and due_bucket='today'.
+// Used from the Missed filter's inline action.
+export async function moveTaskToToday(taskId: number): Promise<void> {
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, "0");
+  const d = String(today.getDate()).padStart(2, "0");
+  const iso = `${y}-${m}-${d}`;
+  const { error } = await supabase
+    .from("tasks")
+    .update({ due_date: iso, due_bucket: "today" })
+    .eq("id", taskId);
+  if (error) throw error;
 }
 
 // Link an existing task to a recurring template as its first instance.
