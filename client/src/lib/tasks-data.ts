@@ -147,6 +147,11 @@ export interface UpdateTaskPatch {
   projectId?: number | null;
   completionReason?: string | null;
   completed?: boolean;
+  // Optional override for completed_at when marking complete. Used by
+  // the backdate-on-completion picker so 'I did this yesterday but
+  // forgot to check the box' honors yesterday's date. Milliseconds
+  // since epoch. Only applied when completed=true and this is set.
+  completedAtOverride?: number;
 }
 
 export async function updateTask(
@@ -170,7 +175,9 @@ export async function updateTask(
   if (patch.completionReason !== undefined)
     dbPatch.completion_reason = patch.completionReason;
   if (patch.completed !== undefined) {
-    dbPatch.completed_at = patch.completed ? Date.now() : null;
+    dbPatch.completed_at = patch.completed
+      ? patch.completedAtOverride ?? Date.now()
+      : null;
   }
 
   const { data, error } = await supabase

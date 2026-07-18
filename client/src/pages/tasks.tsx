@@ -72,8 +72,9 @@ import {
 import { resolveRecurringInstances } from "@/lib/recurring-resolver";
 import { Link } from "wouter";
 
-type Filter = "active" | "missed" | "completed" | "all";
+type Filter = "active" | "missed" | "completed" | "archived" | "all";
 type MissedSubFilter = "all" | "recurring" | "non_recurring";
+type ArchiveTypeFilter = "all" | "recurring" | "non_recurring";
 type TimeframeFilter = "all" | "today" | "this_week" | "this_month";
 
 // Returns today's date as YYYY-MM-DD in the user's local timezone.
@@ -193,22 +194,72 @@ interface CompletionPopupProps {
   open: boolean;
   task: TaskRow | null;
   onCancel: () => void;
-  onConfirm: (actualHours: number | null, reason: string | null) => void;
+  onConfirm: (
+    actualHours: number | null,
+    reason: string | null,
+    completedAtOverride: number | undefined,
+  ) => void;
+  // If true, adds a Today/Yesterday radio at the top so past-due tasks
+  // can be backdated by one day. Neurodivergent-friendly: forgetting to
+  // check off before bed is common and shouldn't require a support
+  // request.
+  pastDue?: boolean;
 }
 
-function CompletionPopup({ open, task, onCancel, onConfirm }: CompletionPopupProps) {
+// End-of-yesterday timestamp in the user's local time. Used as the
+// completed_at value when a user says 'I finished this yesterday.'
+// Yesterday's date at 23:59:00 local converted to milliseconds.
+function endOfYesterdayMs(): number {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  d.setHours(23, 59, 0, 0);
+  return d.getTime();
+}
+
+// Human-readable label for a due_date string like 'Monday', 'Jul 15',
+// or 'yesterday' if it's exactly one day ago. Used in the backdate
+// picker prompt.
+function formatDueDateLabel(iso: string | null): string {
+  if (!iso) return "earlier";
+  const [y, m, d] = iso.split("-").map(Number);
+  const due = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (due.getTime() === yesterday.getTime()) return "yesterday";
+  // Within the last week: use weekday name
+  const diffDays = Math.round((today.getTime() - due.getTime()) / 86400000);
+  if (diffDays > 0 && diffDays <= 6) {
+    return due.toLocaleDateString(undefined, { weekday: "long" });
+  }
+  return due.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function CompletionPopup({
+  open,
+  task,
+  onCancel,
+  onConfirm,
+  pastDue,
+}: CompletionPopupProps) {
   const [hours, setHours] = useState("");
   const [reason, setReason] = useState("");
+  const [whenFinished, setWhenFinished] = useState<"today" | "yesterday">(
+    "today",
+  );
 
   // Reset when a new task is passed in.
   useMemo(() => {
     if (task) {
       setHours(task.estimated_hours != null ? String(task.estimated_hours) : "");
       setReason("");
+      setWhenFinished("today");
     }
   }, [task?.id]);
 
   if (!task) return null;
+  const hasEstimated = task.estimated_hours != null;
 
   const estimated = task.estimated_hours;
   const parsedHours = hours.trim() ? Number(hours) : null;
@@ -227,72 +278,123 @@ function CompletionPopup({ open, task, onCancel, onConfirm }: CompletionPopupPro
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-serif">
-            How did it actually land?
+            {pastDue ? "When did you finish it?" : "How did it actually land?"}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <p className="text-sm italic text-muted-foreground font-serif">
-            No grading. This just helps Quiet Hours learn how you actually
-            estimate so future guesses get closer.
-          </p>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="completion-hours">
-              Actual hours
-              {estimated != null && (
-                <span className="ml-2 text-xs italic text-muted-foreground">
-                  estimated {estimated}h
-                </span>
-              )}
-            </Label>
-            <Input
-              id="completion-hours"
-              type="number"
-              min={0}
-              max={200}
-              step={0.25}
-              value={hours}
-              onChange={(e) => setHours(e.target.value)}
-              placeholder="0.25 steps"
-              data-testid="input-completion-hours"
-            />
-            {variance !== null && (
-              <p className="text-xs italic text-muted-foreground">
-                {variance > 0
-                  ? `${variance}h longer than estimated. Notice, don't grade.`
-                  : variance < 0
-                  ? `${Math.abs(variance)}h shorter than estimated. Nice.`
-                  : `Right on the estimate.`}
+          {/* Backdate picker: shown only for past-due tasks. Two options,
+              default Today. 'Yesterday' sets completed_at to end-of-
+              yesterday local so reports honor the actual completion date.
+              Deliberately no arbitrary past dates: keeps history honest
+              and reduces support surface. */}
+          {pastDue && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                This was due {formatDueDateLabel(task.due_date)}. When did
+                you actually finish it?
               </p>
-            )}
-          </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setWhenFinished("today")}
+                  className={`flex-1 rounded-md border px-3 py-2 text-sm transition ${
+                    whenFinished === "today"
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border text-muted-foreground hover:bg-muted"
+                  }`}
+                  data-testid="backdate-today"
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWhenFinished("yesterday")}
+                  className={`flex-1 rounded-md border px-3 py-2 text-sm transition ${
+                    whenFinished === "yesterday"
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border text-muted-foreground hover:bg-muted"
+                  }`}
+                  data-testid="backdate-yesterday"
+                >
+                  Yesterday
+                </button>
+              </div>
+            </div>
+          )}
+          {hasEstimated && (
+            <p className="text-sm italic text-muted-foreground font-serif">
+              No grading. This just helps Quiet Hours learn how you actually
+              estimate so future guesses get closer.
+            </p>
+          )}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="completion-reason">
-              What made it that long or short?{" "}
-              <span className="text-xs italic text-muted-foreground">
-                optional
-              </span>
-            </Label>
-            <Textarea
-              id="completion-reason"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="One sentence or a paragraph. Anything that surprised you."
-              rows={3}
-              data-testid="input-completion-reason"
-            />
-          </div>
+          {hasEstimated && (
+            <div className="space-y-1.5">
+              <Label htmlFor="completion-hours">
+                Actual hours
+                {estimated != null && (
+                  <span className="ml-2 text-xs italic text-muted-foreground">
+                    estimated {estimated}h
+                  </span>
+                )}
+              </Label>
+              <Input
+                id="completion-hours"
+                type="number"
+                min={0}
+                max={200}
+                step={0.25}
+                value={hours}
+                onChange={(e) => setHours(e.target.value)}
+                placeholder="0.25 steps"
+                data-testid="input-completion-hours"
+              />
+              {variance !== null && (
+                <p className="text-xs italic text-muted-foreground">
+                  {variance > 0
+                    ? `${variance}h longer than estimated. Notice, don't grade.`
+                    : variance < 0
+                    ? `${Math.abs(variance)}h shorter than estimated. Nice.`
+                    : `Right on the estimate.`}
+                </p>
+              )}
+            </div>
+          )}
+
+          {hasEstimated && (
+            <div className="space-y-1.5">
+              <Label htmlFor="completion-reason">
+                What made it that long or short?{" "}
+                <span className="text-xs italic text-muted-foreground">
+                  optional
+                </span>
+              </Label>
+              <Textarea
+                id="completion-reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="One sentence or a paragraph. Anything that surprised you."
+                rows={3}
+                data-testid="input-completion-reason"
+              />
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onCancel}>
-            Skip
+            {hasEstimated ? "Skip" : "Cancel"}
           </Button>
           <Button
-            onClick={() => onConfirm(parsedHours, reason.trim() || null)}
+            onClick={() =>
+              onConfirm(
+                parsedHours,
+                reason.trim() || null,
+                whenFinished === "yesterday" ? endOfYesterdayMs() : undefined,
+              )
+            }
             data-testid="button-completion-save"
           >
-            Save and complete
+            {hasEstimated ? "Save and complete" : "Complete"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -336,16 +438,19 @@ function TaskCard({
 
   const done = task.completed_at != null;
   const hasEstimatedHours = task.estimated_hours != null;
+  const today = todayIsoLocal();
 
   const toggle = useMutation({
     mutationFn: async (opts: {
       actualHours?: number | null;
       reason?: string | null;
+      completedAtOverride?: number;
     }) => {
       await updateTask(task.id, {
         completed: !done,
         actualHours: opts.actualHours ?? undefined,
         completionReason: opts.reason ?? undefined,
+        completedAtOverride: opts.completedAtOverride,
       });
     },
     onSuccess: () => {
@@ -476,17 +581,25 @@ function TaskCard({
     },
   });
 
+  // Past-due = task has a due_date strictly before today and is not
+  // completed yet. Includes missed recurring instances AND non-recurring
+  // past-due tasks. Determines whether the backdate picker appears when
+  // the user checks off the task.
+  const pastDue = !done && task.due_date != null && task.due_date < today;
+
   const handleToggle = () => {
     if (done) {
       // Uncompleting is quiet, no popup
       toggle.mutate({});
       return;
     }
-    if (hasEstimatedHours) {
-      // Prompt for actual hours + reason
+    if (pastDue || hasEstimatedHours) {
+      // Past-due tasks always get the popup (for backdating).
+      // Tasks with estimated hours get the popup even if not past due
+      // (for actual-hours + reason capture).
       setCompleting(true);
     } else {
-      // No estimate to compare against, complete quietly
+      // Not past-due, no estimate to compare against, complete quietly.
       toggle.mutate({});
     }
   };
@@ -677,10 +790,11 @@ function TaskCard({
         open={completing}
         task={task}
         onCancel={() => setCompleting(false)}
-        onConfirm={(actualHours, reason) => {
+        onConfirm={(actualHours, reason, completedAtOverride) => {
           setCompleting(false);
-          toggle.mutate({ actualHours, reason });
+          toggle.mutate({ actualHours, reason, completedAtOverride });
         }}
+        pastDue={pastDue}
       />
 
       <MakeRecurringDialog
@@ -1185,12 +1299,28 @@ export default function Tasks() {
 
   const [missedSub, setMissedSub] = useState<MissedSubFilter>("all");
   const [timeframe, setTimeframe] = useState<TimeframeFilter>("all");
+  // Archive filter controls. Default: last 30 days, all types, no text.
+  const [archiveType, setArchiveType] = useState<ArchiveTypeFilter>("all");
+  const [archiveFrom, setArchiveFrom] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().slice(0, 10);
+  });
+  const [archiveTo, setArchiveTo] = useState<string>(() => todayIsoLocal());
+  const [archiveSearch, setArchiveSearch] = useState("");
   const today = todayIsoLocal();
 
-  // Archived rows never appear in the Tasks page. They live for reports.
+  // Archived rows are treated separately. Non-archived rows populate
+  // Active/Missed/Done/All. Archived rows only appear when the user
+  // explicitly opens the Archived tab.
+  const allRows = tasksQ.data ?? [];
   const nonArchivedRows = useMemo(
-    () => (tasksQ.data ?? []).filter((r) => r.archived_at == null),
-    [tasksQ.data],
+    () => allRows.filter((r) => r.archived_at == null),
+    [allRows],
+  );
+  const archivedRows = useMemo(
+    () => allRows.filter((r) => r.archived_at != null),
+    [allRows],
   );
 
   const filtered = useMemo(() => {
@@ -1213,8 +1343,47 @@ export default function Tasks() {
     if (filter === "completed") {
       return nonArchivedRows.filter((r) => r.completed_at != null);
     }
+    if (filter === "archived") {
+      const q = archiveSearch.trim().toLowerCase();
+      // Inclusive date range on archived_at (YYYY-MM-DD compared against
+      // the ISO date portion of the timestamp).
+      return archivedRows.filter((r) => {
+        if (!r.archived_at) return false;
+        const archivedDate = r.archived_at.slice(0, 10);
+        if (archiveFrom && archivedDate < archiveFrom) return false;
+        if (archiveTo && archivedDate > archiveTo) return false;
+        if (
+          archiveType === "recurring" &&
+          r.recurring_template_id == null
+        ) {
+          return false;
+        }
+        if (
+          archiveType === "non_recurring" &&
+          r.recurring_template_id != null
+        ) {
+          return false;
+        }
+        if (q) {
+          const hay = `${r.title} ${r.notes ?? ""}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+    }
     return nonArchivedRows;
-  }, [nonArchivedRows, filter, missedSub, timeframe, today]);
+  }, [
+    nonArchivedRows,
+    archivedRows,
+    filter,
+    missedSub,
+    timeframe,
+    today,
+    archiveType,
+    archiveFrom,
+    archiveTo,
+    archiveSearch,
+  ]);
 
   const activeCount = nonArchivedRows.filter(
     (r) => r.completed_at == null && !isMissed(r, today),
@@ -1223,6 +1392,7 @@ export default function Tasks() {
   const completedCount = nonArchivedRows.filter(
     (r) => r.completed_at != null,
   ).length;
+  const archivedCount = archivedRows.length;
 
   return (
     <div className="space-y-8">
@@ -1252,6 +1422,12 @@ export default function Tasks() {
             testid="filter-completed"
           />
           <FilterButton
+            label={`Archived (${archivedCount})`}
+            active={filter === "archived"}
+            onClick={() => setFilter("archived")}
+            testid="filter-archived"
+          />
+          <FilterButton
             label="All"
             active={filter === "all"}
             onClick={() => setFilter("all")}
@@ -1260,6 +1436,88 @@ export default function Tasks() {
         </div>
         <NewTaskDialog />
       </div>
+
+      {/* Archived filter controls: type toggle, date range, text search.
+          Only shown when Archived is the current filter. Keeps the panel
+          out of Active/Missed/Done/All. */}
+      {filter === "archived" && archivedCount > 0 && (
+        <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Show</span>
+            <div className="flex items-center gap-1 rounded-md border border-border p-1">
+              <MissedSubButton
+                label="All"
+                active={archiveType === "all"}
+                onClick={() => setArchiveType("all")}
+                testid="archive-type-all"
+              />
+              <MissedSubButton
+                label="Recurring only"
+                active={archiveType === "recurring"}
+                onClick={() => setArchiveType("recurring")}
+                testid="archive-type-recurring"
+              />
+              <MissedSubButton
+                label="Non-recurring only"
+                active={archiveType === "non_recurring"}
+                onClick={() => setArchiveType("non_recurring")}
+                testid="archive-type-non-recurring"
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <label
+                htmlFor="archive-from"
+                className="text-xs text-muted-foreground"
+              >
+                From
+              </label>
+              <Input
+                id="archive-from"
+                type="date"
+                value={archiveFrom}
+                onChange={(e) => setArchiveFrom(e.target.value)}
+                className="h-8 w-40"
+                data-testid="input-archive-from"
+              />
+            </div>
+            <div className="space-y-1">
+              <label
+                htmlFor="archive-to"
+                className="text-xs text-muted-foreground"
+              >
+                To
+              </label>
+              <Input
+                id="archive-to"
+                type="date"
+                value={archiveTo}
+                onChange={(e) => setArchiveTo(e.target.value)}
+                className="h-8 w-40"
+                data-testid="input-archive-to"
+              />
+            </div>
+            <div className="flex-1 min-w-[180px] space-y-1">
+              <label
+                htmlFor="archive-search"
+                className="text-xs text-muted-foreground"
+              >
+                Search title or notes
+              </label>
+              <Input
+                id="archive-search"
+                type="search"
+                value={archiveSearch}
+                onChange={(e) => setArchiveSearch(e.target.value)}
+                placeholder="Type a word or two"
+                className="h-8"
+                data-testid="input-archive-search"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Timeframe select, only shown when Active is the current filter.
           Session 4 will replace this with the calendar/planner view. */}
@@ -1336,7 +1594,7 @@ export default function Tasks() {
                   : null
               }
               showMissedActions={filter === "missed"}
-              showLetGoAction={filter === "completed" || filter === "all"}
+              showLetGoAction={false}
             />
           ))}
         </div>
@@ -1405,6 +1663,8 @@ function EmptyState({ filter }: { filter: Filter }) {
       ? "Nothing missed. If something slipped past a due date, it will land here quietly."
       : filter === "completed"
       ? "No completed tasks yet. Something will land here soon."
+      : filter === "archived"
+      ? "Nothing archived in this range. Widen the dates or clear the search."
       : "No tasks yet. Add one when you're ready.";
   return (
     <Card>
