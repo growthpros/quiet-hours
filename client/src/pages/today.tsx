@@ -26,6 +26,7 @@ import { SpoonMeter } from "@/components/spoon-meter";
 import { PhaseSuggestionBanner } from "@/components/phase-suggestion";
 import { CheckInNudge } from "@/components/checkin-nudge";
 import { BrainDumpReviewNudge } from "@/components/braindump-review-nudge";
+import { MissedRecurringPrompt } from "@/components/missed-recurring-prompt";
 import { DayNavigator, ViewingHistoryRibbon } from "@/components/day-navigator";
 import { ViewingDateProvider, useViewingDate } from "@/lib/viewing-date";
 
@@ -254,6 +255,7 @@ function TodayInner({
 
       {/* ---------- Brain Dump review nudge (today only, if any dumps have remaining items) ---------- */}
       {isToday && <BrainDumpReviewNudge />}
+      {isToday && <MissedRecurringPrompt />}
 
       {/* ---------- Burnout Wave (date-aware) ---------- */}
       <BurnoutWave />
