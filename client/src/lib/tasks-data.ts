@@ -457,6 +457,19 @@ export function remainingItemCount(dump: BrainDumpRow): number {
 // the start of the current local day forward. Idempotent: sets
 // rolled_from_date to yesterday's date the first time we see the task on
 // a new day; won't double-roll within the same day.
+//
+// Session 3.3 change: recurring instances are EXCLUDED from rollover.
+// Their date matters for reporting (History tab, Missed filter, Ask-me
+// prompt) and their on_miss policy controls what happens when they're
+// left incomplete:
+//   - let_it_go: stays on its original date as a Not Completed history row
+//   - ask_me: surfaces in the MissedRecurringPrompt on Today
+//   - always_roll: the resolver rewrites due_date=today when generating
+//                  the next scheduled instance, so it never needs the
+//                  Session 3.2 rollover path
+// A recurring instance's date is its identity; rolling it forward would
+// corrupt the (recurring_template_id, due_date) unique index the moment
+// today's fresh instance gets inserted by the resolver.
 export async function rollOverPreviousTodayTasks(): Promise<number> {
   const now = new Date();
   const startOfToday = new Date(now);
@@ -467,7 +480,8 @@ export async function rollOverPreviousTodayTasks(): Promise<number> {
 
   // Find incomplete tasks in 'today' bucket whose updated_at is before
   // startOfToday AND whose rolled_from_date isn't already yyyyMmDdYesterday
-  // (defensive against double-rolls if the client fires twice).
+  // (defensive against double-rolls if the client fires twice). Skips
+  // any row belonging to a recurring template.
   const { data, error } = await supabase
     .from("tasks")
     .update({
@@ -475,6 +489,7 @@ export async function rollOverPreviousTodayTasks(): Promise<number> {
       updated_at: Date.now(),
     })
     .is("completed_at", null)
+    .is("recurring_template_id", null)
     .eq("due_bucket", "today")
     .lt("updated_at", startOfToday.getTime())
     .neq("rolled_from_date", yyyyMmDdYesterday)

@@ -89,7 +89,15 @@ async function resolveOneTemplate(
 ): Promise<PerTemplateResult> {
   const result: PerTemplateResult = { created: 0, missedCreated: 0 };
 
-  // If already ended, nothing to do.
+  // Always sweep lingering past-due incomplete rows for always_roll
+  // templates, even before checking end conditions. If a user paused a
+  // template that had stragglers, they still shouldn't stay on their
+  // original date. This is a no-op when there's nothing lingering.
+  if (t.on_miss === "always_roll") {
+    await rollLingeringInstancesForward(t, todayIso);
+  }
+
+  // If already ended, nothing more to do.
   if (t.end_date && t.end_date < todayIso) return result;
   if (t.end_after_n !== null && t.occurrences_generated >= t.end_after_n) {
     return result;
@@ -132,6 +140,7 @@ async function resolveOneTemplate(
       // Collapse: create one row stamped today's date, don't fill in
       // past dates. This is deliberate; the user chose "always roll"
       // because they don't want to see each miss individually.
+      // Lingering rows were already handled by the sweep above.
       if (!todayScheduled) {
         const ok = await insertInstance(t, todayIso, /*bucket*/ "today");
         if (ok) result.created++;
@@ -166,6 +175,65 @@ async function resolveOneTemplate(
   if (bookErr) throw bookErr;
 
   return result;
+}
+
+// For an always_roll template, sweep any past-due incomplete instances
+// forward to today so they don't linger on their original date. Only
+// touches rows whose original due_date is strictly before today AND
+// which are still incomplete. Uses a targeted update; the unique index
+// on (recurring_template_id, due_date) would reject collisions if
+// today's row already exists, so we delete stragglers instead of
+// updating when today already has a row.
+async function rollLingeringInstancesForward(
+  t: RecurringTemplateRow,
+  todayIso: string,
+): Promise<void> {
+  // Fetch past-due incomplete rows for this template.
+  const { data: lingering, error: fetchErr } = await supabase
+    .from("tasks")
+    .select("id, due_date")
+    .eq("recurring_template_id", t.id)
+    .is("completed_at", null)
+    .lt("due_date", todayIso);
+  if (fetchErr) throw fetchErr;
+  if (!lingering || lingering.length === 0) return;
+
+  // If today's row exists, we need to delete the stragglers (can't
+  // update due_date to today because the unique index would collide).
+  // If not, update the first straggler to today and delete the rest.
+  const { data: todayRow, error: todayErr } = await supabase
+    .from("tasks")
+    .select("id")
+    .eq("recurring_template_id", t.id)
+    .eq("due_date", todayIso)
+    .maybeSingle();
+  if (todayErr) throw todayErr;
+
+  if (todayRow) {
+    // Delete all lingering rows; today is already represented.
+    const ids = lingering.map((r) => (r as { id: number }).id);
+    const { error } = await supabase.from("tasks").delete().in("id", ids);
+    if (error) throw error;
+  } else {
+    // Promote the most recent straggler to today, delete the rest.
+    const sorted = [...(lingering as { id: number; due_date: string }[])].sort(
+      (a, b) => b.due_date.localeCompare(a.due_date),
+    );
+    const promoteId = sorted[0].id;
+    const restIds = sorted.slice(1).map((r) => r.id);
+    const { error: upErr } = await supabase
+      .from("tasks")
+      .update({ due_date: todayIso, due_bucket: "today" })
+      .eq("id", promoteId);
+    if (upErr) throw upErr;
+    if (restIds.length > 0) {
+      const { error: delErr } = await supabase
+        .from("tasks")
+        .delete()
+        .in("id", restIds);
+      if (delErr) throw delErr;
+    }
+  }
 }
 
 // Insert a task instance from a template. Returns true if inserted,
