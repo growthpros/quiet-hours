@@ -12,7 +12,7 @@
 // Deletion and pausing are confirmed with a Dialog rather than a browser
 // confirm() so the copy stays voice-consistent (no urgent language).
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +47,7 @@ import {
   describePattern,
   type RecurringTemplateRow,
 } from "@/lib/recurring-data";
+import { listTasks, type TaskRow } from "@/lib/tasks-data";
 import {
   RecurringPatternForm,
   validateRecurringPattern,
@@ -88,20 +90,10 @@ function sortTemplates(
 // ---------- Page ----------
 
 export default function Recurring() {
-  const [sortMode, setSortMode] = useState<SortMode>("grouped");
   const templatesQ = useQuery<RecurringTemplateRow[]>({
     queryKey: ["recurring-templates"],
     queryFn: listRecurringTemplates,
   });
-
-  const rows = templatesQ.data ?? [];
-  const sorted = sortTemplates(rows, sortMode);
-  const activeCount = rows.filter((t) => t.active).length;
-  const pausedCount = rows.length - activeCount;
-  // Divider between the two groups appears only for the grouped mode
-  // and only when both groups are non-empty.
-  const showDivider =
-    sortMode === "grouped" && activeCount > 0 && pausedCount > 0;
 
   return (
     <div className="space-y-6">
@@ -112,69 +104,372 @@ export default function Recurring() {
 
       {templatesQ.isLoading ? (
         <p className="text-sm italic text-muted-foreground">One moment…</p>
-      ) : rows.length === 0 ? (
+      ) : (templatesQ.data ?? []).length === 0 ? (
         <EmptyState />
       ) : (
-        <>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              {activeCount} active
-              {pausedCount > 0 ? `, ${pausedCount} paused` : ""}
-            </p>
-            <div className="flex items-center gap-2">
-              <Label
-                htmlFor="sort-mode"
-                className="text-xs text-muted-foreground"
-              >
-                Sort by
-              </Label>
-              <Select
-                value={sortMode}
-                onValueChange={(v) => setSortMode(v as SortMode)}
-              >
-                <SelectTrigger
-                  id="sort-mode"
-                  className="w-56"
-                  data-testid="select-recurring-sort"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(SORT_LABEL) as SortMode[]).map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {SORT_LABEL[m]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {sorted.map((t, idx) => {
-              const isFirstPaused =
-                showDivider &&
-                !t.active &&
-                (idx === 0 || sorted[idx - 1].active);
-              return (
-                <div key={t.id}>
-                  {isFirstPaused && (
-                    <div className="mb-3 mt-2 flex items-center gap-3">
-                      <div className="h-px flex-1 bg-border" />
-                      <span className="text-xs italic text-muted-foreground">
-                        Paused
-                      </span>
-                      <div className="h-px flex-1 bg-border" />
-                    </div>
-                  )}
-                  <TemplateCard template={t} />
-                </div>
-              );
-            })}
-          </div>
-        </>
+        <Tabs defaultValue="templates" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="templates" data-testid="tab-templates">
+              Templates
+            </TabsTrigger>
+            <TabsTrigger value="history" data-testid="tab-history">
+              History
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="templates" className="space-y-3">
+            <TemplatesTab templates={templatesQ.data ?? []} />
+          </TabsContent>
+          <TabsContent value="history" className="space-y-3">
+            <HistoryTab templates={templatesQ.data ?? []} />
+          </TabsContent>
+        </Tabs>
       )}
     </div>
+  );
+}
+
+// ---------- Templates tab (previous default view) ----------
+
+function TemplatesTab({
+  templates,
+}: {
+  templates: RecurringTemplateRow[];
+}) {
+  const [sortMode, setSortMode] = useState<SortMode>("grouped");
+  const rows = templates;
+  const sorted = sortTemplates(rows, sortMode);
+  const activeCount = rows.filter((t) => t.active).length;
+  const pausedCount = rows.length - activeCount;
+  const showDivider =
+    sortMode === "grouped" && activeCount > 0 && pausedCount > 0;
+
+  return (
+    <>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          {activeCount} active
+          {pausedCount > 0 ? `, ${pausedCount} paused` : ""}
+        </p>
+        <div className="flex items-center gap-2">
+          <Label
+            htmlFor="sort-mode"
+            className="text-xs text-muted-foreground"
+          >
+            Sort by
+          </Label>
+          <Select
+            value={sortMode}
+            onValueChange={(v) => setSortMode(v as SortMode)}
+          >
+            <SelectTrigger
+              id="sort-mode"
+              className="w-56"
+              data-testid="select-recurring-sort"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(SORT_LABEL) as SortMode[]).map((m) => (
+                <SelectItem key={m} value={m}>
+                  {SORT_LABEL[m]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {sorted.map((t, idx) => {
+          const isFirstPaused =
+            showDivider &&
+            !t.active &&
+            (idx === 0 || sorted[idx - 1].active);
+          return (
+            <div key={t.id}>
+              {isFirstPaused && (
+                <div className="mb-3 mt-2 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-xs italic text-muted-foreground">
+                    Paused
+                  </span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+              )}
+              <TemplateCard template={t} />
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+// ---------- History tab: report of generated instances ----------
+
+type HistoryStatus = "all" | "done" | "missed";
+
+const STATUS_LABEL: Record<HistoryStatus, string> = {
+  all: "All",
+  done: "Done",
+  missed: "Missed",
+};
+
+function todayIsoLocal(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function HistoryTab({
+  templates,
+}: {
+  templates: RecurringTemplateRow[];
+}) {
+  const tasksQ = useQuery<TaskRow[]>({
+    queryKey: ["tasks"],
+    queryFn: listTasks,
+  });
+
+  const [status, setStatus] = useState<HistoryStatus>("all");
+  const [templateId, setTemplateId] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().slice(0, 10);
+  });
+  const [dateTo, setDateTo] = useState<string>(() => todayIsoLocal());
+
+  const templatesById = useMemo(() => {
+    const m = new Map<number, RecurringTemplateRow>();
+    for (const t of templates) m.set(t.id, t);
+    return m;
+  }, [templates]);
+
+  const today = todayIsoLocal();
+
+  // Only tasks that came from a template. Filter by status, template,
+  // and date range on due_date.
+  const rows = useMemo(() => {
+    const all = (tasksQ.data ?? []).filter(
+      (t) => t.recurring_template_id != null,
+    );
+    return all
+      .filter((t) => {
+        // Status filter
+        if (status === "done" && t.completed_at == null) return false;
+        if (
+          status === "missed" &&
+          (t.completed_at != null ||
+            !t.due_date ||
+            t.due_date >= today)
+        ) {
+          return false;
+        }
+        // Template filter
+        if (templateId !== "all") {
+          if (String(t.recurring_template_id) !== templateId) return false;
+        }
+        // Date range on due_date (fallback to created if no due_date)
+        const stamp = t.due_date ?? "";
+        if (dateFrom && stamp && stamp < dateFrom) return false;
+        if (dateTo && stamp && stamp > dateTo) return false;
+        return true;
+      })
+      .sort((a, b) =>
+        (b.due_date ?? "").localeCompare(a.due_date ?? ""),
+      );
+  }, [tasksQ.data, status, templateId, dateFrom, dateTo, today]);
+
+  // Small stats bar counts across the current filtered set
+  const stats = useMemo(() => {
+    let done = 0;
+    let missed = 0;
+    for (const t of rows) {
+      if (t.completed_at != null) done++;
+      else if (t.due_date && t.due_date < today) missed++;
+    }
+    return { done, missed, total: rows.length };
+  }, [rows, today]);
+
+  return (
+    <>
+      <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Show</span>
+          <div className="flex items-center gap-1 rounded-md border border-border p-1">
+            {(Object.keys(STATUS_LABEL) as HistoryStatus[]).map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatus(s)}
+                className={`rounded px-2 py-1 text-xs transition ${
+                  status === s
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted"
+                }`}
+                data-testid={`history-status-${s}`}
+              >
+                {STATUS_LABEL[s]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1">
+            <label
+              htmlFor="history-template"
+              className="text-xs text-muted-foreground"
+            >
+              Template
+            </label>
+            <Select value={templateId} onValueChange={setTemplateId}>
+              <SelectTrigger
+                id="history-template"
+                className="h-8 w-56"
+                data-testid="select-history-template"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All templates</SelectItem>
+                {templates.map((t) => (
+                  <SelectItem key={t.id} value={String(t.id)}>
+                    {t.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label
+              htmlFor="history-from"
+              className="text-xs text-muted-foreground"
+            >
+              From
+            </label>
+            <Input
+              id="history-from"
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-8 w-40"
+              data-testid="input-history-from"
+            />
+          </div>
+          <div className="space-y-1">
+            <label
+              htmlFor="history-to"
+              className="text-xs text-muted-foreground"
+            >
+              To
+            </label>
+            <Input
+              id="history-to"
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-8 w-40"
+              data-testid="input-history-to"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+        <span data-testid="history-count-total">
+          {stats.total} instance{stats.total === 1 ? "" : "s"}
+        </span>
+        <span data-testid="history-count-done">
+          {stats.done} done
+        </span>
+        <span data-testid="history-count-missed">
+          {stats.missed} missed
+        </span>
+      </div>
+
+      {tasksQ.isLoading ? (
+        <p className="text-sm italic text-muted-foreground">One moment…</p>
+      ) : rows.length === 0 ? (
+        <Card>
+          <CardContent className="space-y-2 py-8 text-center">
+            <p className="font-serif text-base">Nothing in this range.</p>
+            <p className="mx-auto max-w-md text-sm text-muted-foreground">
+              Widen the dates or switch the status. If a template only started
+              recently, its history is still growing.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((t) => (
+            <HistoryRow
+              key={t.id}
+              task={t}
+              template={
+                t.recurring_template_id != null
+                  ? templatesById.get(t.recurring_template_id) ?? null
+                  : null
+              }
+              today={today}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function HistoryRow({
+  task,
+  template,
+  today,
+}: {
+  task: TaskRow;
+  template: RecurringTemplateRow | null;
+  today: string;
+}) {
+  const done = task.completed_at != null;
+  const isMissed =
+    !done && task.due_date != null && task.due_date < today;
+  return (
+    <Card data-testid={`history-row-${task.id}`}>
+      <CardContent className="flex flex-wrap items-center justify-between gap-3 p-3">
+        <div className="min-w-0 flex-1">
+          <p
+            className={`font-serif text-sm ${
+              done ? "text-muted-foreground" : "text-foreground"
+            }`}
+          >
+            {task.title}
+          </p>
+          {template && (
+            <p className="text-xs italic text-muted-foreground">
+              From {template.title}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          <span className="text-muted-foreground">
+            Due {task.due_date ?? "unscheduled"}
+          </span>
+          {done ? (
+            <Badge variant="outline" className="text-xs">
+              Done
+            </Badge>
+          ) : isMissed ? (
+            <Badge variant="outline" className="text-xs">
+              Missed
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs">
+              Upcoming
+            </Badge>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
