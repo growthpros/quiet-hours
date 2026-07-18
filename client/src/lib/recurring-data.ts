@@ -157,7 +157,7 @@ export async function createRecurringTemplate(
     user_id,
     title: input.title,
     notes: input.notes ?? null,
-    spoon_estimate: input.spoon_estimate ?? 3,
+    spoon_estimate: input.spoon_estimate ?? 0.5,
     estimated_hours: input.estimated_hours ?? 0.5,
     complexity: input.complexity ?? ("low" as Complexity),
     billable: input.billable ?? false,
