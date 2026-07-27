@@ -244,6 +244,15 @@ async function insertInstance(
   dueDate: string,
   bucket: "today" | null,
 ): Promise<boolean> {
+  // Session 3.3.1 fix: tasks.created_at and tasks.updated_at are
+  // bigint NOT NULL with no server default (they're ms-since-epoch
+  // set by the client, matching how createTask() writes them). The
+  // original insertInstance omitted these, so every fresh recurring
+  // instance insert silently failed with a NOT NULL violation. The
+  // outer catch reported it as a 'partial error' and the resolver
+  // moved on, leaving templates with adopted rows but no scheduled
+  // instances.
+  const nowMs = Date.now();
   const row = {
     user_id: t.user_id,
     title: t.title,
@@ -257,6 +266,8 @@ async function insertInstance(
     due_date: dueDate,
     due_bucket: bucket,
     recurring_template_id: t.id,
+    created_at: nowMs,
+    updated_at: nowMs,
   };
   const { error } = await supabase.from("tasks").insert(row);
   if (error) {
