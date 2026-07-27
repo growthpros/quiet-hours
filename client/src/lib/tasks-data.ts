@@ -377,13 +377,39 @@ export async function moveTaskToToday(taskId: number): Promise<void> {
 // Link an existing task to a recurring template as its first instance.
 // Used by the Make-Recurring flow so the current task adopts the template
 // rather than creating a duplicate row for today.
+//
+// Session 3.3.1 fix: if the existing task has due_date=null (common
+// when created with the default 'Today' timeline, which only sets
+// due_bucket='today'), stamp due_date=today so the unique index on
+// (recurring_template_id, due_date) prevents the resolver from
+// creating a second row for today, and so downstream queries like
+// Missed/Ask-me/History that key off due_date work correctly.
 export async function linkTaskToRecurringTemplate(
   taskId: number,
   templateId: number,
 ): Promise<void> {
+  const { data: existing, error: readErr } = await supabase
+    .from("tasks")
+    .select("due_date")
+    .eq("id", taskId)
+    .single();
+  if (readErr) throw readErr;
+
+  const patch: Record<string, unknown> = {
+    recurring_template_id: templateId,
+  };
+  if (!(existing as { due_date: string | null })?.due_date) {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    patch.due_date = `${y}-${m}-${day}`;
+    patch.due_bucket = "today";
+  }
+
   const { error } = await supabase
     .from("tasks")
-    .update({ recurring_template_id: templateId })
+    .update(patch)
     .eq("id", taskId);
   if (error) throw error;
 }

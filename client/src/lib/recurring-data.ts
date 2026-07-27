@@ -210,6 +210,48 @@ export async function updateRecurringTemplate(
   return data as RecurringTemplateRow;
 }
 
+// Session 3.3.1 change per Caroline's Jul 27 review:
+// After editing a template, propagate the task-shape fields to every
+// INCOMPLETE instance of that template. Completed history rows are
+// left alone so past reports stay accurate.
+//
+// Only task-shape fields are copied: title, notes, spoons, hours,
+// complexity, billable. Not touched: due_date (each instance keeps
+// its scheduled date), completed_at, actual_hours, completion_reason,
+// due_bucket, client_id/project_id (those can drift per-instance if
+// the user edits them individually), and any pattern fields (those
+// are template-only).
+//
+// Returns the count of tasks touched so the toast can tell the user.
+export async function propagateTemplateEditsToIncompleteTasks(
+  templateId: number,
+  values: {
+    title: string;
+    notes: string | null;
+    spoon_estimate: number;
+    estimated_hours: number;
+    complexity: Complexity;
+    billable: boolean;
+  },
+): Promise<number> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .update({
+      title: values.title,
+      notes: values.notes,
+      spoon_estimate: values.spoon_estimate,
+      estimated_hours: values.estimated_hours,
+      complexity: values.complexity,
+      billable: values.billable,
+      updated_at: Date.now(),
+    })
+    .eq("recurring_template_id", templateId)
+    .is("completed_at", null)
+    .select("id");
+  if (error) throw error;
+  return (data ?? []).length;
+}
+
 // Deleting a template does NOT delete already-generated instances. The
 // FK on tasks.recurring_template_id is ON DELETE SET NULL, so past
 // history remains intact but orphan-linked.

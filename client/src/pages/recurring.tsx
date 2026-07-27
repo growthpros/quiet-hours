@@ -42,6 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   listRecurringTemplates,
   updateRecurringTemplate,
+  propagateTemplateEditsToIncompleteTasks,
   deleteRecurringTemplate,
   setRecurringActive,
   describePattern,
@@ -677,11 +678,17 @@ function EditTemplateDialog({
       const title = value.title.trim();
       if (!title) throw new Error("Title is required.");
 
+      const spoonEstimate = Number.parseFloat(value.spoon_estimate || "0.5");
+      const estimatedHours = Number.parseFloat(
+        value.estimated_hours || "0.5",
+      );
+      const notes = value.notes.trim() || null;
+
       await updateRecurringTemplate(template.id, {
         title,
-        notes: value.notes.trim() || null,
-        spoon_estimate: Number.parseInt(value.spoon_estimate || "3", 10),
-        estimated_hours: Number.parseFloat(value.estimated_hours || "0.5"),
+        notes,
+        spoon_estimate: spoonEstimate,
+        estimated_hours: estimatedHours,
         complexity: value.complexity,
         billable: value.billable,
         pattern_type: value.pattern.pattern_type,
@@ -697,19 +704,39 @@ function EditTemplateDialog({
         on_miss: value.pattern.on_miss,
       });
 
-      // Edits to the pattern only affect FUTURE generations. Existing
-      // instances in tasks stay as they are. We still run the resolver
-      // so any newly-eligible dates get generated.
+      // Session 3.3.1: propagate task-shape edits to incomplete
+      // instances so today's row picks up the new title, spoons, etc.
+      // Completed history rows are left untouched.
+      const touchedCount = await propagateTemplateEditsToIncompleteTasks(
+        template.id,
+        {
+          title,
+          notes,
+          spoon_estimate: spoonEstimate,
+          estimated_hours: estimatedHours,
+          complexity: value.complexity,
+          billable: value.billable,
+        },
+      );
+
+      // Also run the resolver so any newly-eligible dates get
+      // generated (e.g. the user extended end_date or changed the
+      // pattern to include today).
       await resolveRecurringInstances();
+
+      return touchedCount;
     },
-    onSuccess: () => {
+    onSuccess: (touchedCount) => {
       onClose();
       qc.invalidateQueries({ queryKey: ["recurring-templates"] });
       qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
       toast({
         title: "Saved.",
         description:
-          "Changes apply to future generations. Existing tasks are unchanged.",
+          touchedCount > 0
+            ? `Also updated ${touchedCount} open task${touchedCount === 1 ? "" : "s"} to match. Completed history stays unchanged.`
+            : "Changes apply to future generations.",
       });
     },
     onError: (e) => {
@@ -763,6 +790,7 @@ function EditTemplateDialog({
                 type="number"
                 min={0}
                 max={10}
+                step={0.25}
                 value={value.spoon_estimate}
                 onChange={(e) =>
                   setValue({ ...value, spoon_estimate: e.target.value })
