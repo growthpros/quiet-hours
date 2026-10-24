@@ -3,6 +3,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { DEFAULT_PILLARS } from "@/lib/foundation-defaults";
+import { localIsoDate } from "@/lib/local-date";
 
 // ---------- Types ----------
 export type PillarTargetType =
@@ -80,14 +81,6 @@ async function requireUserId(): Promise<string> {
   const id = data.user?.id;
   if (!id) throw new Error("Not signed in");
   return id;
-}
-
-function todayLocalDateString(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
 }
 
 // ---------- Profile ----------
@@ -255,7 +248,7 @@ export async function deletePillar(id: number): Promise<void> {
 
 // ---------- Daily logs ----------
 export async function listTodayLogs(): Promise<DailyFoundationLogRow[]> {
-  return listLogsForDate(todayLocalDateString());
+  return listLogsForDate(localIsoDate());
 }
 
 export async function listLogsForDate(ymd: string): Promise<DailyFoundationLogRow[]> {
@@ -278,7 +271,7 @@ export async function upsertTodayLog(
   },
 ): Promise<DailyFoundationLogRow> {
   const user_id = await requireUserId();
-  const today = todayLocalDateString();
+  const today = localIsoDate();
   const now = Date.now();
 
   const record = {

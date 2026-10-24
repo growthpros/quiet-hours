@@ -17,14 +17,11 @@ import {
   useState,
 } from "react";
 import { useLocation } from "wouter";
+import { localIsoDate } from "@/lib/local-date";
 
 // ---------- Helpers ----------
 export function todayLocalDateString(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return localIsoDate();
 }
 
 export function isValidYmd(v: string): boolean {
@@ -37,10 +34,7 @@ export function ymdToDate(ymd: string): Date {
 }
 
 export function dateToYmd(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return localIsoDate(d);
 }
 
 export function addDays(ymd: string, delta: number): string {

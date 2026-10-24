@@ -37,6 +37,7 @@ import {
   listRecurringTemplates,
   type RecurringTemplateRow,
 } from "@/lib/recurring-data";
+import { localIsoDate } from "@/lib/local-date";
 
 // End-of-yesterday timestamp in the user's local time. Used when a user
 // says 'I actually did this yesterday' from the prompt. Matches the
@@ -46,14 +47,6 @@ function endOfYesterdayMs(): number {
   d.setDate(d.getDate() - 1);
   d.setHours(23, 59, 0, 0);
   return d.getTime();
-}
-
-function todayIsoLocal(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
 }
 
 // Format a due_date like 'yesterday', weekday name, or 'Jul 15'.
@@ -89,7 +82,7 @@ export function MissedRecurringPrompt() {
     staleTime: 60_000,
   });
 
-  const today = todayIsoLocal();
+  const today = localIsoDate();
 
   // Only rows that are: incomplete, past-due, from a template, whose
   // template exists and has on_miss='ask_me'. Missing templates or

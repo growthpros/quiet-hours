@@ -71,20 +71,12 @@ import {
 } from "@/lib/recurring-data";
 import { resolveRecurringInstances } from "@/lib/recurring-resolver";
 import { Link } from "wouter";
+import { addLocalDays, localIsoDate } from "@/lib/local-date";
 
 type Filter = "active" | "missed" | "completed" | "archived" | "all";
 type MissedSubFilter = "all" | "recurring" | "non_recurring";
 type ArchiveTypeFilter = "all" | "recurring" | "non_recurring";
 type TimeframeFilter = "all" | "today" | "this_week" | "this_month";
-
-// Returns today's date as YYYY-MM-DD in the user's local timezone.
-function todayIsoLocal(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 // Missed = task is incomplete AND is on a date that has already passed.
 // Per Session 3.3 decision (Option B):
@@ -438,7 +430,7 @@ function TaskCard({
 
   const done = task.completed_at != null;
   const hasEstimatedHours = task.estimated_hours != null;
-  const today = todayIsoLocal();
+  const today = localIsoDate();
 
   const toggle = useMutation({
     mutationFn: async (opts: {
@@ -1114,7 +1106,7 @@ function NewTaskDialog() {
       // Only check the budget when the task lands on Today AND has spoons.
       const landsOnToday =
         conv.dueBucket === "today" ||
-        (conv.dueDate === new Date().toISOString().slice(0, 10));
+        (conv.dueDate === localIsoDate());
       const spoonNum = conv.spoonEstimate ?? 0;
 
       if (!landsOnToday || spoonNum === 0) {
@@ -1302,13 +1294,11 @@ export default function Tasks() {
   // Archive filter controls. Default: last 30 days, all types, no text.
   const [archiveType, setArchiveType] = useState<ArchiveTypeFilter>("all");
   const [archiveFrom, setArchiveFrom] = useState<string>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return d.toISOString().slice(0, 10);
+    return localIsoDate(addLocalDays(new Date(), -30));
   });
-  const [archiveTo, setArchiveTo] = useState<string>(() => todayIsoLocal());
+  const [archiveTo, setArchiveTo] = useState<string>(() => localIsoDate());
   const [archiveSearch, setArchiveSearch] = useState("");
-  const today = todayIsoLocal();
+  const today = localIsoDate();
 
   // Archived rows are treated separately. Non-archived rows populate
   // Active/Missed/Done/All. Archived rows only appear when the user
