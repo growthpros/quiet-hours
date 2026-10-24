@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/hooks/use-toast";
-import { exportAllMyData, deleteAllMyData } from "@/lib/data";
+import { exportAllMyData, deleteMyAccount } from "@/lib/data";
 import { CheckInCadenceCard } from "@/components/checkin-cadence-card";
 import { queryClient } from "@/lib/queryClient";
 import { Download, LogOut, Trash2 } from "lucide-react";
@@ -59,11 +59,14 @@ export default function Settings() {
   const onDeleteAll = async () => {
     setDeleting(true);
     try {
-      await deleteAllMyData();
+      await deleteMyAccount();
       queryClient.clear();
       // Auth listener will flip us back to the sign-in page.
     } catch (e) {
-      toast({ title: "Delete failed", description: String(e) });
+      toast({
+        title: "Couldn't delete your account. Nothing was removed.",
+        description: e instanceof Error ? e.message : String(e),
+      });
       setDeleting(false);
     }
   };
@@ -109,9 +112,9 @@ export default function Settings() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="font-serif text-sm italic text-muted-foreground">
-            Everything you've logged — check-ins, tasks, checklists,
-            compassion entries — is stored in a private database only you
-            can read. You can take a copy with you at any time.
+            Everything you've logged (check-ins, tasks, brain dumps,
+            foundation logs and more) is stored in a private database only
+            you can read. You can take a copy with you any time.
           </p>
           <Button
             variant="outline"
@@ -133,30 +136,30 @@ export default function Settings() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="font-serif text-sm italic text-muted-foreground">
-            This removes every task, checklist, compassion entry, and burnout
-            check-in tied to your account. It cannot be undone. You'll be
-            signed out.
+            This deletes your account and everything in it: every task,
+            check-in, brain dump, log and setting. It can't be undone. You'll
+            be signed out, and if you come back later, you'll start fresh.
           </p>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" data-testid="button-delete-all">
-                <Trash2 className="mr-1.5 h-4 w-4" /> Delete my data and sign
-                me out
+                <Trash2 className="mr-1.5 h-4 w-4" /> Delete my account
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle className="font-serif">
-                  Delete everything?
+                  Delete your account?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Every row you've logged will be permanently removed. Consider
-                  exporting first if there's anything you'd want to keep.
+                  Your account and everything you've logged will be
+                  permanently removed. If there's anything you'd like to keep,
+                  export it first.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel data-testid="button-delete-cancel">
-                  Keep my data
+                  Keep my account
                 </AlertDialogCancel>
                 <AlertDialogAction
                   onClick={onDeleteAll}
@@ -164,7 +167,7 @@ export default function Settings() {
                   data-testid="button-delete-confirm"
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  {deleting ? "Deleting\u2026" : "Yes, delete everything"}
+                  {deleting ? "Deleting\u2026" : "Yes, delete my account"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
