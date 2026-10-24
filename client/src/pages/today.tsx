@@ -106,7 +106,7 @@ function CrossCard({
   testid,
 }: {
   href: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number | string }>;
   eyebrow: string;
   title: string;
   body: string;

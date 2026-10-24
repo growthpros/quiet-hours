@@ -550,7 +550,7 @@ function OverviewCard({
   headline,
   body,
 }: {
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number | string }>;
   eyebrow: string;
   headline: string;
   body: string;

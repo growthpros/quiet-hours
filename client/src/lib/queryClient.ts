@@ -24,15 +24,15 @@ import {
 } from "@/lib/data";
 
 // Camel/snake shim so pages that expect ChecklistRun.templateLabel etc. still work.
-function toCamel<T extends Record<string, unknown>>(row: T): T {
+function toCamel<T extends object>(row: T): T {
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(row)) {
+  for (const [k, v] of Object.entries(row as Record<string, unknown>)) {
     const camel = k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
     out[camel] = v;
   }
   return out as T;
 }
-function arrToCamel<T extends Record<string, unknown>>(rows: T[]): T[] {
+function arrToCamel<T extends object>(rows: T[]): T[] {
   return rows.map(toCamel);
 }
 
