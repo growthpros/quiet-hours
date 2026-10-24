@@ -179,7 +179,7 @@ function TaskChips({ task }: { task: TaskRow }) {
   if (task.due_date) {
     chips.push(new Date(task.due_date + "T00:00:00").toLocaleDateString());
   }
-  if (task.rolled_from_date) chips.push("rolled from yesterday");
+  if (task.rolled_from_date) chips.push("carried over");
   if (chips.length === 0) return null;
   return (
     <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
