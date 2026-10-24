@@ -8,6 +8,11 @@ import path from "node:path";
 //
 // The Supabase values below are placeholders so modules that import the
 // Supabase client can load. Tests never talk to a real database.
+// Run every test in US Eastern time, where Caroline and many users live.
+// Date bugs that only show up in the evening (when local and UTC dates
+// differ) can't hide behind a server's UTC clock this way.
+process.env.TZ = "America/New_York";
+
 export default defineConfig({
   resolve: {
     alias: {

@@ -3,6 +3,7 @@
 // everything to the current user automatically.
 
 import { supabase } from "@/lib/supabase";
+import { addLocalDays, localIsoDate, startOfLocalDay } from "@/lib/local-date";
 
 // ---------- Row shapes ----------
 
@@ -496,13 +497,20 @@ export function remainingItemCount(dump: BrainDumpRow): number {
 // A recurring instance's date is its identity; rolling it forward would
 // corrupt the (recurring_template_id, due_date) unique index the moment
 // today's fresh instance gets inserted by the resolver.
+export function rolloverCutoff(now: Date = new Date()): {
+  startOfTodayMs: number;
+  yesterdayIso: string;
+} {
+  const startOfToday = startOfLocalDay(now);
+  return {
+    startOfTodayMs: startOfToday.getTime(),
+    yesterdayIso: localIsoDate(addLocalDays(startOfToday, -1)),
+  };
+}
+
 export async function rollOverPreviousTodayTasks(): Promise<number> {
-  const now = new Date();
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-  const yesterday = new Date(startOfToday);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yyyyMmDdYesterday = yesterday.toISOString().slice(0, 10);
+  const { startOfTodayMs, yesterdayIso: yyyyMmDdYesterday } = rolloverCutoff();
+  const startOfToday = new Date(startOfTodayMs);
 
   // Find incomplete tasks in 'today' bucket whose updated_at is before
   // startOfToday AND whose rolled_from_date isn't already yyyyMmDdYesterday
@@ -518,7 +526,9 @@ export async function rollOverPreviousTodayTasks(): Promise<number> {
     .is("recurring_template_id", null)
     .eq("due_bucket", "today")
     .lt("updated_at", startOfToday.getTime())
-    .neq("rolled_from_date", yyyyMmDdYesterday)
+    // Include tasks that have never been carried over (rolled_from_date is
+    // empty). A plain .neq() skips empty values, which meant this never ran.
+    .or(`rolled_from_date.is.null,rolled_from_date.neq.${yyyyMmDdYesterday}`)
     .select();
   if (error) throw error;
   return (data ?? []).length;
