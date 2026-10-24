@@ -316,35 +316,56 @@ export async function fetchStreaks(): Promise<Streaks> {
   return out;
 }
 
-// ---------- Account: delete everything for this user ----------
-// The auth.users → tables use ON DELETE CASCADE, so removing the auth user
-// wipes all rows. But we can't drop auth users from the client — the client
-// can only sign out. Deleting data explicitly is safer: purge every row we own,
-// then sign out. The user's auth account is orphaned but empty.
-export async function deleteAllMyData() {
-  await Promise.all([
-    supabase.from("delegation_tasks").delete().neq("id", -1),
-    supabase.from("checklist_runs").delete().neq("id", -1),
-    supabase.from("compassion_entries").delete().neq("id", -1),
-    supabase.from("burnout_checkins").delete().neq("id", -1),
-  ]);
-  await supabase.auth.signOut();
+// ---------- Account: delete my account ----------
+// Calls the delete_my_account database function (migration 013), which
+// deletes the signed-in person's login. Every table that holds their data
+// is linked to the login with ON DELETE CASCADE, so everything goes with it,
+// including tables added in the future.
+export async function deleteMyAccount() {
+  const { error } = await supabase.rpc("delete_my_account");
+  if (error) throw error;
+  // The login no longer exists, so only clear the session on this device.
+  await supabase.auth.signOut({ scope: "local" });
 }
 
 // ---------- Export everything as JSON ----------
+// Every table that holds a person's data. Row-level security means each
+// query returns only the signed-in person's own rows.
+// data.test.ts fails if a table in supabase/ is missing from this list.
+export const USER_DATA_TABLES = [
+  "brain_dumps",
+  "burnout_checkins",
+  "checklist_runs",
+  "clients",
+  "compassion_entries",
+  "daily_foundation_logs",
+  "delegation_tasks",
+  "earn_back_actions",
+  "earn_back_events",
+  "foundation_pillars",
+  "override_events",
+  "phase_transitions",
+  "projects",
+  "recurring_task_templates",
+  "spoon_ledger",
+  "tags",
+  "task_tags",
+  "tasks",
+  "user_chip_library",
+  "user_profiles",
+] as const;
+
 export async function exportAllMyData() {
-  const [delegation, checklists, compassion, burnout] = await Promise.all([
-    listDelegation(),
-    listChecklists(),
-    listCompassion(),
-    listBurnout(),
-  ]);
+  const results = await Promise.all(
+    USER_DATA_TABLES.map(async (table) => {
+      const { data, error } = await supabase.from(table).select("*");
+      if (error) throw new Error(`Export failed on ${table}: ${error.message}`);
+      return [table, data ?? []] as const;
+    }),
+  );
   return {
     exportedAt: new Date().toISOString(),
-    version: 1,
-    delegation,
-    checklists,
-    compassion,
-    burnout,
+    version: 2,
+    tables: Object.fromEntries(results),
   };
 }
