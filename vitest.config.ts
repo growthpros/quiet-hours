@@ -11,7 +11,8 @@ import path from "node:path";
 // Run every test in US Eastern time, where Caroline and many users live.
 // Date bugs that only show up in the evening (when local and UTC dates
 // differ) can't hide behind a server's UTC clock this way.
-process.env.TZ = "America/New_York";
+// (Set TZ yourself to run them somewhere else, e.g. TZ=Australia/Sydney.)
+process.env.TZ ??= "America/New_York";
 
 export default defineConfig({
   resolve: {

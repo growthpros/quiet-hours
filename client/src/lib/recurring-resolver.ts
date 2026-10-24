@@ -22,6 +22,7 @@
 // errors as no-op.
 
 import { supabase } from "@/lib/supabase";
+import { localIsoDate } from "@/lib/local-date";
 import type {
   RecurringTemplateRow,
   RecurringOnMiss,
@@ -59,7 +60,8 @@ export async function resolveRecurringInstances(
     return result;
   }
 
-  const todayIso = toIsoDate(today);
+  // "Today" is the person's local date, not UTC (see local-date.ts).
+  const todayIso = localIsoDate(today);
 
   for (const t of (templates ?? []) as RecurringTemplateRow[]) {
     result.templatesConsidered++;

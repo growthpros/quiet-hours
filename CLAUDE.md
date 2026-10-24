@@ -50,7 +50,10 @@ The test project holds no real data. Use it freely. Production holds real users'
 
 **Dates**
 
-- Users think in their own local day. Any "what day is it" logic must use the user's local date, never UTC. (Known bug: `toIsoDate(new Date())` in `recurring-resolver.ts` uses UTC, so recurring tasks run a day ahead in the evening in the US. Fix pending.)
+- Users think in their own local day. Any "what day is it" logic must use the user's local date, never UTC.
+- Use the helpers in `client/src/lib/local-date.ts` (`localIsoDate`, `startOfLocalDay`, `addLocalDays`). Don't write your own copy.
+- `no-utc-dates.test.ts` fails if UTC shortcuts like `toISOString().slice(0, 10)` appear in app code.
+- Inside `recurring-resolver.ts`, the pattern math works on plain YYYY-MM-DD dates in UTC on purpose. That's correct as long as the starting "today" comes from `localIsoDate()`.
 
 **Errors**
 

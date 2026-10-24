@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import type { BurnoutCheckinRow } from "@/lib/supabase";
 import { DEFAULT_EARN_BACK } from "@/lib/spoon-defaults";
 import { getOrCreateProfile, updateProfile } from "@/lib/foundation-data";
+import { localIsoDate } from "@/lib/local-date";
 
 // ---------- Types ----------
 export interface SpoonLedgerRow {
@@ -74,14 +75,6 @@ async function requireUserId(): Promise<string> {
   return id;
 }
 
-function todayLocalDateString(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
 // ---------- Spoon issuance formula ----------
 // spoons = 12 + energy_score - (sensory - 3) - state_penalty - body_count/2
 // Cap between 6 and 20.
@@ -122,7 +115,7 @@ function bodyCountFrom(symptomsJson: string | null): number {
 
 // ---------- Ledger ----------
 export async function getOrCreateTodayLedger(): Promise<SpoonLedgerRow> {
-  return getOrCreateLedgerForDate(todayLocalDateString());
+  return getOrCreateLedgerForDate(localIsoDate());
 }
 
 export async function getOrCreateLedgerForDate(ymd: string): Promise<SpoonLedgerRow> {
@@ -139,7 +132,7 @@ export async function getOrCreateLedgerForDate(ymd: string): Promise<SpoonLedger
 
   // For past days, don't insert an empty row. Return a synthetic empty ledger
   // so read-only past-day view doesn't clutter the DB with zero rows.
-  const today = todayLocalDateString();
+  const today = localIsoDate();
   if (ymd !== today) {
     return {
       id: -1,
@@ -175,7 +168,7 @@ export async function getOrCreateLedgerForDate(ymd: string): Promise<SpoonLedger
 
 async function patchLedger(patch: Partial<Pick<SpoonLedgerRow, "allotted" | "committed" | "spent" | "earned_back">>): Promise<SpoonLedgerRow> {
   const user_id = await requireUserId();
-  const today = todayLocalDateString();
+  const today = localIsoDate();
   await getOrCreateTodayLedger();
   const { data, error } = await supabase
     .from("spoon_ledger")
@@ -314,7 +307,7 @@ export async function deleteEarnBackAction(id: number): Promise<void> {
 
 // ---------- Earn-back events ----------
 export async function listTodayEarnBackEvents(): Promise<EarnBackEventRow[]> {
-  return listEarnBackEventsForDate(todayLocalDateString());
+  return listEarnBackEventsForDate(localIsoDate());
 }
 
 export async function listEarnBackEventsForDate(ymd: string): Promise<EarnBackEventRow[]> {
@@ -336,7 +329,7 @@ export async function logEarnBack(input: {
   note?: string | null;
 }): Promise<{ event: EarnBackEventRow; ledger: SpoonLedgerRow }> {
   const user_id = await requireUserId();
-  const today = todayLocalDateString();
+  const today = localIsoDate();
 
   // Check duration threshold, if any
   if (
@@ -417,7 +410,7 @@ export async function logOverride(input: {
   freeText: string;
 }): Promise<OverrideEventRow> {
   const user_id = await requireUserId();
-  const today = todayLocalDateString();
+  const today = localIsoDate();
   const now = Date.now();
   const { data, error } = await supabase
     .from("override_events")

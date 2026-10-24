@@ -24,6 +24,7 @@ import { exportAllMyData, deleteAllMyData } from "@/lib/data";
 import { CheckInCadenceCard } from "@/components/checkin-cadence-card";
 import { queryClient } from "@/lib/queryClient";
 import { Download, LogOut, Trash2 } from "lucide-react";
+import { localIsoDate } from "@/lib/local-date";
 
 export default function Settings() {
   const { user, signOut } = useAuth();
@@ -41,7 +42,7 @@ export default function Settings() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      const stamp = new Date().toISOString().slice(0, 10);
+      const stamp = localIsoDate();
       a.download = `quiet-hours-${stamp}.json`;
       document.body.appendChild(a);
       a.click();

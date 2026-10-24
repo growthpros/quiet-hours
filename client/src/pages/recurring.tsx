@@ -55,6 +55,7 @@ import {
   type RecurringPatternValue,
 } from "@/components/recurring-pattern-form";
 import { resolveRecurringInstances } from "@/lib/recurring-resolver";
+import { addLocalDays, localIsoDate } from "@/lib/local-date";
 
 // ---------- Sort options ----------
 
@@ -216,14 +217,6 @@ const STATUS_LABEL: Record<HistoryStatus, string> = {
   missed: "Missed",
 };
 
-function todayIsoLocal(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
 function HistoryTab({
   templates,
 }: {
@@ -237,11 +230,9 @@ function HistoryTab({
   const [status, setStatus] = useState<HistoryStatus>("all");
   const [templateId, setTemplateId] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<string>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return d.toISOString().slice(0, 10);
+    return localIsoDate(addLocalDays(new Date(), -30));
   });
-  const [dateTo, setDateTo] = useState<string>(() => todayIsoLocal());
+  const [dateTo, setDateTo] = useState<string>(() => localIsoDate());
 
   const templatesById = useMemo(() => {
     const m = new Map<number, RecurringTemplateRow>();
@@ -249,7 +240,7 @@ function HistoryTab({
     return m;
   }, [templates]);
 
-  const today = todayIsoLocal();
+  const today = localIsoDate();
 
   // Only tasks that came from a template. Filter by status, template,
   // and date range on due_date.
