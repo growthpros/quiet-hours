@@ -125,3 +125,24 @@ describe("tomorrow and a picked date", () => {
     expect(matchesTimeframe(task({ due_date: "2026-10-22" }), "date", TODAY)).toBe(false);
   });
 });
+
+describe("choosing the week start", () => {
+  // Wednesday Oct 21, 2026
+  it("Monday weeks run Monday to Sunday", () => {
+    expect(weekRange(TODAY, 0, 1)).toEqual({ start: "2026-10-19", end: "2026-10-25" });
+    expect(weekRange(TODAY, 1, 1)).toEqual({ start: "2026-10-26", end: "2026-11-01" });
+  });
+  it("Saturday weeks run Saturday to Friday", () => {
+    expect(weekRange(TODAY, 0, 6)).toEqual({ start: "2026-10-17", end: "2026-10-23" });
+  });
+  it("on the start day itself, the week begins that day", () => {
+    expect(weekRange("2026-10-19", 0, 1).start).toBe("2026-10-19");
+    expect(weekRange("2026-10-25", 0, 1).start).toBe("2026-10-19");
+  });
+  it("This week follows the chosen start (Sunday Oct 25 is this week for Monday starters)", () => {
+    const sunday = task({ due_date: "2026-10-25" });
+    expect(matchesTimeframe(sunday, "this_week", TODAY, undefined, 1)).toBe(true);
+    expect(matchesTimeframe(sunday, "this_week", TODAY, undefined, 0)).toBe(false);
+    expect(matchesTimeframe(sunday, "next_week", TODAY, undefined, 0)).toBe(true);
+  });
+});

@@ -10,6 +10,7 @@ import {
   Moon,
   Settings as SettingsIcon,
   CheckSquare,
+  CalendarDays,
   Cloud,
   Repeat,
 } from "lucide-react";
@@ -30,6 +31,7 @@ import { useTheme } from "@/components/theme-provider";
 export const NAV_ITEMS = [
   { title: "Today", url: "/", icon: Sun },
   { title: "Tasks", url: "/tasks", icon: CheckSquare },
+  { title: "Calendar", url: "/calendar", icon: CalendarDays },
   { title: "Repeats", url: "/recurring", icon: Repeat },
   { title: "Brain dump", url: "/brain-dump", icon: Cloud },
   { title: "Delegation", url: "/delegation", icon: Split },

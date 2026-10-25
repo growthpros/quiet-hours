@@ -2,7 +2,8 @@
 //
 // One place for these rules, so Today, the spoon meter and the Tasks page
 // always agree. Dates are plain YYYY-MM-DD strings in the person's local
-// day (see local-date.ts). Weeks start on Sunday, the app's convention.
+// day (see local-date.ts). Weeks start on the person's chosen day
+// (Sunday by default; see user_profiles.week_starts_on).
 
 import { addLocalDays, localIsoDate } from "@/lib/local-date";
 import type { TaskRow } from "@/lib/tasks-data";
@@ -46,11 +47,20 @@ export function isOnToday(t: TaskLike, todayIso: string): boolean {
   return t.due_bucket === "today";
 }
 
-// Sunday-to-Saturday ranges, as YYYY-MM-DD strings.
-export function weekRange(todayIso: string, weeksAhead = 0): { start: string; end: string } {
+// Day 0 is Sunday, 1 Monday, 6 Saturday.
+export type WeekStartDay = 0 | 1 | 6;
+
+// A seven-day week containing todayIso (or N weeks ahead), as YYYY-MM-DD
+// strings, starting on the person's chosen day.
+export function weekRange(
+  todayIso: string,
+  weeksAhead = 0,
+  weekStartsOn: WeekStartDay = 0,
+): { start: string; end: string } {
   const today = new Date(`${todayIso}T12:00:00`);
-  const sunday = addLocalDays(today, -today.getDay() + 7 * weeksAhead);
-  return { start: localIsoDate(sunday), end: localIsoDate(addLocalDays(sunday, 6)) };
+  const back = (today.getDay() - weekStartsOn + 7) % 7;
+  const first = addLocalDays(today, -back + 7 * weeksAhead);
+  return { start: localIsoDate(first), end: localIsoDate(addLocalDays(first, 6)) };
 }
 
 function inRange(iso: string, start: string, end: string): boolean {
@@ -70,6 +80,7 @@ export function matchesTimeframe(
   tf: Timeframe,
   todayIso: string,
   pickedDate?: string,
+  weekStartsOn: WeekStartDay = 0,
 ): boolean {
   if (!isOpen(t)) return false;
   if (tf === "all") return true;
@@ -84,8 +95,8 @@ export function matchesTimeframe(
   const today = isOnToday(t, todayIso);
   if (tf === "today") return today;
 
-  const thisWeek = weekRange(todayIso, 0);
-  const nextWeek = weekRange(todayIso, 1);
+  const thisWeek = weekRange(todayIso, 0, weekStartsOn);
+  const nextWeek = weekRange(todayIso, 1, weekStartsOn);
 
   if (tf === "this_week") {
     if (today || t.due_bucket === "this_week") return true;
