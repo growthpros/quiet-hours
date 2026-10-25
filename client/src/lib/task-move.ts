@@ -121,3 +121,29 @@ export function whenForRepeatChoice(choice: "today" | "tomorrow", todayIso: stri
     dueBucket: null,
   };
 }
+
+// ---------- Dragging on the Calendar ----------
+// A dragged task follows the same rules as the Move menu: a one-time task
+// can land on today or any later day; a repeat only on days before its
+// next scheduled occurrence. Done tasks don't move.
+
+export interface DropRange {
+  earliest: string;
+  /** null means no upper limit. */
+  latest: string | null;
+}
+
+export function dropRange(
+  task: { completed_at: number | string | null; recurring_template_id: number | null; due_date: string | null },
+  template: RecurringTemplateRow | null,
+  todayIso: string,
+): DropRange | null {
+  if (task.completed_at != null) return null;
+  if (task.recurring_template_id == null) return { earliest: todayIso, latest: null };
+  if (!template) return null;
+  return repeatMoveWindow(template, task.due_date ?? todayIso, todayIso);
+}
+
+export function canDropOn(range: DropRange | null, iso: string): boolean {
+  return range != null && iso >= range.earliest && (range.latest == null || iso <= range.latest);
+}
