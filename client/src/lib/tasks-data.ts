@@ -4,6 +4,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { addLocalDays, localIsoDate, startOfLocalDay } from "@/lib/local-date";
+import { committedSpoonsToday } from "@/lib/task-timeframe";
 
 // ---------- Row shapes ----------
 
@@ -199,19 +200,19 @@ export async function deleteTask(id: number): Promise<void> {
 // ---------- Committed-spoons helper ----------
 // Sum of spoon_estimate across incomplete tasks. Used to decide whether
 // adding a new task would push today past budget.
+// Spoons already committed today, used by the budget check when adding a
+// task. Only today's unfinished tasks count (see task-timeframe.ts).
 export async function committedSpoonsFromTasks(): Promise<number> {
   const { data, error } = await supabase
     .from("tasks")
-    .select("spoon_estimate, completed_at")
+    .select(
+      "spoon_estimate, completed_at, archived_at, due_date, due_bucket, recurring_template_id",
+    )
     .is("completed_at", null);
   if (error) throw error;
-  const rows = (data ?? []) as Array<{
-    spoon_estimate: number | null;
-    completed_at: number | null;
-  }>;
-  return rows.reduce(
-    (acc, r) => acc + (r.spoon_estimate ? Number(r.spoon_estimate) : 0),
-    0,
+  return committedSpoonsToday(
+    (data ?? []) as Parameters<typeof committedSpoonsToday>[0],
+    localIsoDate(),
   );
 }
 
