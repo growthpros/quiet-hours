@@ -2,7 +2,7 @@
 // a day. Phase 1 of the beta plan (week view). Month view and dragging
 // between days come next.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Repeat } from "lucide-react";
@@ -13,9 +13,12 @@ import { MoveTaskMenu } from "@/components/move-task-menu";
 import { listTasks, type TaskRow } from "@/lib/tasks-data";
 import { listRecurringTemplates, type RecurringTemplateRow } from "@/lib/recurring-data";
 import { localIsoDate } from "@/lib/local-date";
+import { isoAddDays } from "@/lib/task-move";
+import { clearAddressQuery, parseDateParam } from "@/lib/date-param";
 import { useWeekStart } from "@/lib/use-week-start";
 import {
   groupWeek,
+  weeksAheadFor,
   UNSCHEDULED_LABEL,
   type CalendarDay,
   type DayItem,
@@ -49,7 +52,13 @@ function daySummary(d: CalendarDay): string {
 export default function Calendar() {
   const today = localIsoDate();
   const weekStartsOn = useWeekStart();
-  const [weeksAhead, setWeeksAhead] = useState(0);
+  // The week shown is the one holding this date. The Tasks page can open
+  // the Calendar on a given week with ?week=YYYY-MM-DD.
+  const [anchor, setAnchor] = useState<string>(
+    () => parseDateParam(window.location.search, window.location.hash, "week") ?? today,
+  );
+  useEffect(() => clearAddressQuery(), []);
+  const weeksAhead = weeksAheadFor(today, anchor, weekStartsOn);
 
   const tasksQ = useQuery<TaskRow[]>({ queryKey: ["tasks"], queryFn: listTasks });
   const templatesQ = useQuery<RecurringTemplateRow[]>({
@@ -73,7 +82,7 @@ export default function Calendar() {
         <Button
           size="icon"
           variant="ghost"
-          onClick={() => setWeeksAhead((w) => w - 1)}
+          onClick={() => setAnchor((a) => isoAddDays(a, -7))}
           aria-label="Previous week"
           data-testid="button-week-prev"
         >
@@ -85,7 +94,7 @@ export default function Calendar() {
         <Button
           size="icon"
           variant="ghost"
-          onClick={() => setWeeksAhead((w) => w + 1)}
+          onClick={() => setAnchor((a) => isoAddDays(a, 7))}
           aria-label="Next week"
           data-testid="button-week-next"
         >
@@ -95,7 +104,7 @@ export default function Calendar() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => setWeeksAhead(0)}
+            onClick={() => setAnchor(today)}
             data-testid="button-week-this"
           >
             This week

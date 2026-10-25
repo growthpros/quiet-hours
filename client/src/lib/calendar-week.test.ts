@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { groupWeek } from "@/lib/calendar-week";
+import { groupWeek, weeksAheadFor } from "@/lib/calendar-week";
 import type { TaskRow } from "@/lib/tasks-data";
 import type { RecurringTemplateRow } from "@/lib/recurring-data";
 
@@ -137,5 +137,20 @@ describe("upcoming repeats", () => {
     expect(upcomingOn(n, "2026-10-27")).toEqual([]);
     const w = groupWeek([], TODAY, 0, 0, [paused, ended, limited]);
     expect(upcomingOn(w, "2026-10-22")).toEqual(["Ended", "Limited"]);
+  });
+});
+
+describe("weeksAheadFor", () => {
+  it("counts whole weeks for the person's week start", () => {
+    // Today is Wednesday, Oct 21.
+    expect(weeksAheadFor(TODAY, TODAY)).toBe(0);
+    expect(weeksAheadFor(TODAY, "2026-10-24")).toBe(0); // same Sunday week
+    expect(weeksAheadFor(TODAY, "2026-10-25")).toBe(1); // next Sunday week
+    expect(weeksAheadFor(TODAY, "2026-10-25", 1)).toBe(0); // Monday weeks: still this week
+    expect(weeksAheadFor(TODAY, "2026-11-02", 1)).toBe(2);
+    expect(weeksAheadFor(TODAY, "2026-10-10")).toBe(-2);
+  });
+  it("works across the change from daylight time", () => {
+    expect(weeksAheadFor("2026-10-28", "2026-11-04")).toBe(1);
   });
 });

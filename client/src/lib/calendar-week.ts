@@ -124,6 +124,23 @@ export function groupWeek(
   return { start, end, days, unscheduled };
 }
 
+// How many weeks ahead (or back, if negative) the week holding dateIso is
+// from the week holding today, for the person's week start.
+export function weeksAheadFor(
+  todayIso: string,
+  dateIso: string,
+  weekStartsOn: WeekStartDay = 0,
+): number {
+  const a = weekRange(todayIso, 0, weekStartsOn).start;
+  const b = weekRange(dateIso, 0, weekStartsOn).start;
+  const days = Math.round(
+    (Date.UTC(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8, 10)) -
+      Date.UTC(+a.slice(0, 4), +a.slice(5, 7) - 1, +a.slice(8, 10))) /
+      86_400_000,
+  );
+  return Math.round(days / 7);
+}
+
 // Future occurrences of each active repeat inside [start..end], after
 // today. Skips a day that already has a real task for that repeat, and
 // stops at the repeat's end date or occurrence limit.

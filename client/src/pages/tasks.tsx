@@ -74,7 +74,7 @@ import { addLocalDays, localIsoDate } from "@/lib/local-date";
 import { isMissed, matchesTimeframe, type Timeframe } from "@/lib/task-timeframe";
 import { MoveTaskMenu } from "@/components/move-task-menu";
 import { useWeekStart } from "@/lib/use-week-start";
-import { parseDateParam } from "@/lib/date-param";
+import { clearAddressQuery, parseDateParam } from "@/lib/date-param";
 import {
   timeframeWindow,
   upcomingInWindow,
@@ -1240,15 +1240,7 @@ export default function Tasks() {
   );
   // Clear the ?date= once it's been read, so it doesn't stick around and
   // reapply the next time the Tasks page opens.
-  useEffect(() => {
-    if (window.location.search || window.location.hash.includes("?")) {
-      window.history.replaceState(
-        null,
-        "",
-        window.location.pathname + window.location.hash.replace(/\?.*$/, ""),
-      );
-    }
-  }, []);
+  useEffect(() => clearAddressQuery(), []);
   const weekStartsOn = useWeekStart();
   // Archive filter controls. Default: last 30 days, all types, no text.
   const [archiveType, setArchiveType] = useState<ArchiveTypeFilter>("all");
@@ -1585,7 +1577,11 @@ export default function Tasks() {
             />
           ))}
           {upcoming.length > 0 && (
-            <UpcomingRepeats items={upcoming} singleDay={singleDay} />
+            <UpcomingRepeats
+              items={upcoming}
+              singleDay={singleDay}
+              weekOf={upcomingWindow!.start}
+            />
           )}
         </div>
       )}
@@ -1617,9 +1613,12 @@ function upcomingLine(u: UpcomingRepeat, singleDay: boolean): string {
 function UpcomingRepeats({
   items,
   singleDay,
+  weekOf,
 }: {
   items: UpcomingRepeat[];
   singleDay: boolean;
+  /** A day in the timeframe, so the Calendar link opens on that week. */
+  weekOf: string;
 }) {
   return (
     <div
@@ -1646,7 +1645,7 @@ function UpcomingRepeats({
       </ul>
       <p className="mt-3 text-xs italic text-muted-foreground">
         These become tasks on their day. See them by day on the{" "}
-        <Link href="/calendar" className="underline underline-offset-2 hover:text-foreground">
+        <Link href={`/calendar?week=${weekOf}`} className="underline underline-offset-2 hover:text-foreground">
           Calendar
         </Link>
         .
