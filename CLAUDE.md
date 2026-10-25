@@ -58,6 +58,12 @@ The test project holds no real data. Use it freely. Production holds real users'
 - `no-utc-dates.test.ts` fails if UTC shortcuts like `toISOString().slice(0, 10)` appear in app code.
 - Inside `recurring-resolver.ts`, the pattern math works on plain YYYY-MM-DD dates in UTC on purpose. That's correct as long as the starting "today" comes from `localIsoDate()`.
 
+**Tasks and time**
+
+- "On today," "missed" and the Tasks page timeframes live in `client/src/lib/task-timeframe.ts`. Use them; don't write new filters.
+- A task has one answer to "when": a timeframe (`due_bucket`) or a specific day (`due_date`), never both. Moving rules live in `client/src/lib/task-move.ts`.
+- A repeat occurrence keeps a specific date and can only move to a day before its next scheduled occurrence (`repeatMoveWindow`).
+
 **Errors**
 
 - Don't swallow errors silently. If a failure is safe to ignore, log it and say why in a comment.

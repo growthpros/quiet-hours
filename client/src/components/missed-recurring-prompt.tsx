@@ -38,6 +38,7 @@ import {
   type RecurringTemplateRow,
 } from "@/lib/recurring-data";
 import { localIsoDate } from "@/lib/local-date";
+import { repeatMoveWindow, repeatQuickChoices } from "@/lib/task-move";
 
 // End-of-yesterday timestamp in the user's local time. Used when a user
 // says 'I actually did this yesterday' from the prompt. Matches the
@@ -88,9 +89,13 @@ export function MissedRecurringPrompt() {
   // template exists and has on_miss='ask_me'. Missing templates or
   // 'let_it_go' / 'always_roll' templates are excluded because they
   // shouldn't nag the user.
+  const templatesById = useMemo(() => {
+    const map = new Map<number, RecurringTemplateRow>();
+    for (const t of templatesQ.data ?? []) map.set(t.id, t);
+    return map;
+  }, [templatesQ.data]);
+
   const rows = useMemo(() => {
-    const templatesById = new Map<number, RecurringTemplateRow>();
-    for (const t of templatesQ.data ?? []) templatesById.set(t.id, t);
     return (tasksQ.data ?? [])
       .filter((t) => {
         if (t.completed_at != null) return false;
@@ -104,7 +109,7 @@ export function MissedRecurringPrompt() {
       .sort((a, b) =>
         (a.due_date ?? "").localeCompare(b.due_date ?? ""),
       );
-  }, [tasksQ.data, templatesQ.data, today]);
+  }, [tasksQ.data, templatesById, today]);
 
   const moveMut = useMutation({
     mutationFn: async (taskId: number) => moveTaskToToday(taskId),
@@ -170,6 +175,16 @@ export function MissedRecurringPrompt() {
             <MissedRow
               key={task.id}
               task={task}
+              // Only offer "Move to today" when today is before this repeat's
+              // next occurrence, so it can't create a second copy for today.
+              canMoveToToday={repeatQuickChoices(
+                repeatMoveWindow(
+                  templatesById.get(task.recurring_template_id!)!,
+                  task.due_date!,
+                  today,
+                ),
+                today,
+              ).includes("today")}
               onMoveToToday={() =>
                 moveMut.mutate(task.id, {
                   onSuccess: () =>
@@ -211,12 +226,14 @@ export function MissedRecurringPrompt() {
 
 function MissedRow({
   task,
+  canMoveToToday,
   onMoveToToday,
   onKeepInHistory,
   onMarkDone,
   pending,
 }: {
   task: TaskRow;
+  canMoveToToday: boolean;
   onMoveToToday: () => void;
   onKeepInHistory: () => void;
   onMarkDone: () => void;
@@ -235,15 +252,17 @@ function MissedRow({
         </p>
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onMoveToToday}
-          disabled={pending}
-          data-testid={`missed-prompt-move-${task.id}`}
-        >
-          Move to today
-        </Button>
+        {canMoveToToday && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onMoveToToday}
+            disabled={pending}
+            data-testid={`missed-prompt-move-${task.id}`}
+          >
+            Move to today
+          </Button>
+        )}
         <Button
           size="sm"
           variant="outline"
