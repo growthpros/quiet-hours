@@ -7,7 +7,14 @@
 import { addLocalDays, localIsoDate } from "@/lib/local-date";
 import type { TaskRow } from "@/lib/tasks-data";
 
-export type Timeframe = "today" | "this_week" | "next_week" | "this_month" | "all";
+export type Timeframe =
+  | "today"
+  | "tomorrow"
+  | "this_week"
+  | "next_week"
+  | "this_month"
+  | "all"
+  | "date";
 
 type TaskLike = Pick<
   TaskRow,
@@ -52,14 +59,27 @@ function inRange(iso: string, start: string, end: string): boolean {
 
 // Does a task show under a timeframe on the Tasks page?
 //   today:      on today
+//   tomorrow:   due tomorrow
+//   date:       due on the picked date (on that day, includes missed ones)
 //   this_week:  on today, or the rest of this week (date or bucket)
 //   next_week:  next week (date or bucket)
 //   this_month: on today, or the rest of this month (date, this week, or month bucket)
 //   all:        any open task
-export function matchesTimeframe(t: TaskLike, tf: Timeframe, todayIso: string): boolean {
+export function matchesTimeframe(
+  t: TaskLike,
+  tf: Timeframe,
+  todayIso: string,
+  pickedDate?: string,
+): boolean {
   if (!isOpen(t)) return false;
   if (tf === "all") return true;
+  if (tf === "date") {
+    if (!pickedDate) return false;
+    if (pickedDate === todayIso) return isOnToday(t, todayIso);
+    return t.due_date === pickedDate;
+  }
   if (isMissed(t, todayIso)) return false;
+  if (tf === "tomorrow") return t.due_date === localIsoDate(addLocalDays(new Date(`${todayIso}T12:00:00`), 1));
 
   const today = isOnToday(t, todayIso);
   if (tf === "today") return today;

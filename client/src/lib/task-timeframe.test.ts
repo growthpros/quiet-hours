@@ -103,3 +103,25 @@ describe("committedSpoonsToday", () => {
     expect(committedSpoonsToday(tasks, TODAY)).toBe(4.5);
   });
 });
+
+describe("tomorrow and a picked date", () => {
+  it("tomorrow shows tasks due tomorrow only", () => {
+    expect(matchesTimeframe(task({ due_date: "2026-10-22" }), "tomorrow", TODAY)).toBe(true);
+    expect(matchesTimeframe(task({ due_bucket: "this_week" }), "tomorrow", TODAY)).toBe(false);
+    expect(matchesTimeframe(task({ due_bucket: "today" }), "tomorrow", TODAY)).toBe(false);
+  });
+  it("a picked future date shows tasks due that day", () => {
+    expect(matchesTimeframe(task({ due_date: "2026-11-03" }), "date", TODAY, "2026-11-03")).toBe(true);
+    expect(matchesTimeframe(task({ due_date: "2026-11-04" }), "date", TODAY, "2026-11-03")).toBe(false);
+  });
+  it("picking today shows the same tasks as Today", () => {
+    expect(matchesTimeframe(task({ due_bucket: "today" }), "date", TODAY, TODAY)).toBe(true);
+    expect(matchesTimeframe(task({ due_date: "2026-10-22" }), "date", TODAY, TODAY)).toBe(false);
+  });
+  it("a picked past date includes what was missed that day", () => {
+    expect(matchesTimeframe(task({ due_date: "2026-10-19", due_bucket: "this_week" }), "date", TODAY, "2026-10-19")).toBe(true);
+  });
+  it("no picked date shows nothing", () => {
+    expect(matchesTimeframe(task({ due_date: "2026-10-22" }), "date", TODAY)).toBe(false);
+  });
+});

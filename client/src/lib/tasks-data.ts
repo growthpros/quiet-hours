@@ -534,3 +534,24 @@ export async function rollOverPreviousTodayTasks(): Promise<number> {
   if (error) throw error;
   return (data ?? []).length;
 }
+
+// Move a task to another day or timeframe. Returns where it was before,
+// so the caller can offer Undo.
+export async function moveTask(
+  task: Pick<TaskRow, "id" | "due_date" | "due_bucket">,
+  to: { dueDate: string | null; dueBucket: DueBucket | null },
+): Promise<{ dueDate: string | null; dueBucket: DueBucket | null }> {
+  const previous = { dueDate: task.due_date, dueBucket: task.due_bucket };
+  const { error } = await supabase
+    .from("tasks")
+    .update({ due_date: to.dueDate, due_bucket: to.dueBucket, updated_at: Date.now() })
+    .eq("id", task.id);
+  if (error) {
+    // 23505 = a repeat already has a copy on that day (unique index).
+    if ((error as { code?: string }).code === "23505") {
+      throw new Error("This repeat already has a copy on that day.");
+    }
+    throw error;
+  }
+  return previous;
+}

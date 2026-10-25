@@ -42,7 +42,6 @@ import {
   breakDownTask,
   linkTaskToRecurringTemplate,
   archiveTask,
-  moveTaskToToday,
   DUE_BUCKET_LABEL,
   type TaskRow,
   type DueBucket,
@@ -73,6 +72,7 @@ import { resolveRecurringInstances } from "@/lib/recurring-resolver";
 import { Link } from "wouter";
 import { addLocalDays, localIsoDate } from "@/lib/local-date";
 import { isMissed, matchesTimeframe, type Timeframe } from "@/lib/task-timeframe";
+import { MoveTaskMenu } from "@/components/move-task-menu";
 
 type Filter = "active" | "missed" | "completed" | "archived" | "all";
 type MissedSubFilter = "all" | "recurring" | "non_recurring";
@@ -94,10 +94,12 @@ type TimeframeFilter = Timeframe;
 
 const TIMEFRAME_LABEL: Record<TimeframeFilter, string> = {
   today: "Today",
+  tomorrow: "Tomorrow",
   this_week: "This week",
   next_week: "Next week",
   this_month: "This month",
   all: "Any time",
+  date: "Pick a date\u2026",
 };
 
 // ---------- Task summary chips (below title, when values are present) ----------
@@ -452,21 +454,6 @@ function TaskCard({
     },
   });
 
-  const moveToToday = useMutation({
-    mutationFn: async () => moveTaskToToday(task.id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["tasks"] });
-      qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
-      toast({ title: "Moved to today." });
-    },
-    onError: (e) => {
-      toast({
-        title: "Couldn't move",
-        description: e instanceof Error ? e.message : String(e),
-      });
-    },
-  });
-
   const del = useMutation({
     mutationFn: async () => deleteTask(task.id),
     onSuccess: () => {
@@ -639,15 +626,7 @@ function TaskCard({
                     row visually calm; no red, no urgency. */}
                 {showMissedActions && (
                   <div className="flex flex-wrap items-center gap-3 pt-1 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => moveToToday.mutate()}
-                      disabled={moveToToday.isPending}
-                      className="italic text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
-                      data-testid={`button-task-move-today-${task.id}`}
-                    >
-                      Move to today
-                    </button>
+                    <MoveTaskMenu task={task} template={template} variant="text" />
                     <button
                       type="button"
                       onClick={() => archive.mutate()}
@@ -675,6 +654,9 @@ function TaskCard({
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-1">
+                {!done && !showMissedActions && (
+                  <MoveTaskMenu task={task} template={template} />
+                )}
                 {!done && (
                   <Button
                     size="icon"
@@ -1240,6 +1222,7 @@ export default function Tasks() {
 
   const [missedSub, setMissedSub] = useState<MissedSubFilter>("all");
   const [timeframe, setTimeframe] = useState<TimeframeFilter>("today");
+  const [pickedDate, setPickedDate] = useState<string>(() => localIsoDate());
   // Archive filter controls. Default: last 30 days, all types, no text.
   const [archiveType, setArchiveType] = useState<ArchiveTypeFilter>("all");
   const [archiveFrom, setArchiveFrom] = useState<string>(() => {
@@ -1264,6 +1247,13 @@ export default function Tasks() {
 
   const filtered = useMemo(() => {
     if (filter === "active") {
+      // A picked date shows everything due that day, including anything
+      // missed on a past day, so the missed check is left to the filter.
+      if (timeframe === "date") {
+        return nonArchivedRows.filter((r) =>
+          matchesTimeframe(r, "date", today, pickedDate),
+        );
+      }
       const active = nonArchivedRows.filter(
         (r) => r.completed_at == null && !isMissed(r, today),
       );
@@ -1317,6 +1307,7 @@ export default function Tasks() {
     filter,
     missedSub,
     timeframe,
+    pickedDate,
     today,
     archiveType,
     archiveFrom,
@@ -1481,6 +1472,16 @@ export default function Tasks() {
               ))}
             </SelectContent>
           </Select>
+          {timeframe === "date" && (
+            <Input
+              type="date"
+              value={pickedDate}
+              onChange={(e) => setPickedDate(e.target.value || localIsoDate())}
+              className="h-8 w-40"
+              aria-label="Show tasks due on this day"
+              data-testid="input-timeframe-date"
+            />
+          )}
         </div>
       )}
 
