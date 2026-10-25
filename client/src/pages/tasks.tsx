@@ -75,6 +75,11 @@ import { isMissed, matchesTimeframe, type Timeframe } from "@/lib/task-timeframe
 import { MoveTaskMenu } from "@/components/move-task-menu";
 import { useWeekStart } from "@/lib/use-week-start";
 import { parseDateParam } from "@/lib/date-param";
+import {
+  timeframeWindow,
+  upcomingInWindow,
+  type UpcomingRepeat,
+} from "@/lib/upcoming-repeats";
 
 type Filter = "active" | "missed" | "completed" | "archived" | "all";
 type MissedSubFilter = "all" | "recurring" | "non_recurring";
@@ -1340,6 +1345,23 @@ export default function Tasks() {
     archiveSearch,
   ]);
 
+  // Repeats that fall in the chosen timeframe but aren't tasks yet. Same
+  // rule as the Calendar, so both pages show the same load.
+  const upcomingWindow =
+    filter === "active"
+      ? timeframeWindow(timeframe, today, pickedDate, weekStartsOn)
+      : null;
+  const upcoming = useMemo(
+    () =>
+      upcomingWindow
+        ? upcomingInWindow(templatesQ.data ?? [], allRows, today, upcomingWindow)
+        : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [templatesQ.data, allRows, today, upcomingWindow?.start, upcomingWindow?.end],
+  );
+  const singleDay =
+    upcomingWindow != null && upcomingWindow.start === upcomingWindow.end;
+
   const activeCount = nonArchivedRows.filter(
     (r) => r.completed_at == null && !isMissed(r, today),
   ).length;
@@ -1545,7 +1567,7 @@ export default function Tasks() {
         <p className="font-serif text-sm italic text-muted-foreground">
           Loading&hellip;
         </p>
-      ) : filtered.length === 0 ? (
+      ) : filtered.length === 0 && upcoming.length === 0 ? (
         <EmptyState filter={filter} />
       ) : (
         <div className="space-y-3">
@@ -1562,8 +1584,73 @@ export default function Tasks() {
               showLetGoAction={false}
             />
           ))}
+          {upcoming.length > 0 && (
+            <UpcomingRepeats items={upcoming} singleDay={singleDay} />
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+function spoonText(n: number): string {
+  return `${Number.isInteger(n) ? n : Number(n.toFixed(2))} spoon${n === 1 ? "" : "s"}`;
+}
+
+// One line per repeat. A single day shows its spoons; a week or month
+// shows the schedule and how many times, so a daily repeat appears once.
+function upcomingLine(u: UpcomingRepeat, singleDay: boolean): string {
+  const t = u.template;
+  const spoons = t.spoon_estimate ? Number(t.spoon_estimate) : 0;
+  if (singleDay) return [t.title, spoons ? spoonText(spoons) : null].filter(Boolean).join(", ");
+  const pattern = describePattern(t);
+  return [
+    t.title,
+    pattern.charAt(0).toLowerCase() + pattern.slice(1),
+    u.count === 1 ? "once" : `${u.count} times`,
+    spoons ? `${spoonText(spoons)}${u.count > 1 ? " each" : ""}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function UpcomingRepeats({
+  items,
+  singleDay,
+}: {
+  items: UpcomingRepeat[];
+  singleDay: boolean;
+}) {
+  return (
+    <div
+      className="rounded-md border border-dashed border-border px-4 py-3"
+      data-testid="tasks-upcoming-repeats"
+    >
+      <p className="mb-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+        Repeats coming up
+      </p>
+      <ul className="space-y-1.5">
+        {items.map((u) => (
+          <li
+            key={u.template.id}
+            className="text-sm text-foreground/80"
+            data-testid={`upcoming-repeat-${u.template.id}`}
+          >
+            <Repeat
+              className="mr-1.5 inline h-3.5 w-3.5 align-[-2px] text-muted-foreground"
+              aria-label="Repeats"
+            />
+            {upcomingLine(u, singleDay)}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-xs italic text-muted-foreground">
+        These become tasks on their day. See them by day on the{" "}
+        <Link href="/calendar" className="underline underline-offset-2 hover:text-foreground">
+          Calendar
+        </Link>
+        .
+      </p>
     </div>
   );
 }
