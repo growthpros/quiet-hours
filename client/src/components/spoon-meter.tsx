@@ -158,15 +158,9 @@ export function SpoonMeter() {
 
   const spent = (ledger ? Number(ledger.spent) : 0) + spentFromTasksToday;
 
+  // Only today's unfinished tasks count against today's budget.
   const committed = isToday
-    ? (tasksQ.data ?? [])
-        .filter((t) => t.completed_at == null)
-        .reduce(
-          (acc, t) =>
-            acc +
-            (t.spoon_estimate != null ? Number(t.spoon_estimate) : 0),
-          0,
-        )
+    ? committedSpoonsToday(tasksQ.data ?? [], localIsoDate())
     : ledger
     ? Number(ledger.committed)
     : 0;
@@ -420,6 +414,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { committedSpoonsToday } from "@/lib/task-timeframe";
+import { localIsoDate } from "@/lib/local-date";
 
 interface EarnBackPanelProps {
   actions: EarnBackActionRow[];

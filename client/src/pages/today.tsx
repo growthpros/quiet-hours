@@ -29,6 +29,8 @@ import { BrainDumpReviewNudge } from "@/components/braindump-review-nudge";
 import { MissedRecurringPrompt } from "@/components/missed-recurring-prompt";
 import { DayNavigator, ViewingHistoryRibbon } from "@/components/day-navigator";
 import { ViewingDateProvider, useViewingDate } from "@/lib/viewing-date";
+import { isOnToday } from "@/lib/task-timeframe";
+import { localIsoDate } from "@/lib/local-date";
 
 function dayOfYear(): number {
   const now = new Date();
@@ -162,8 +164,9 @@ export default function Today() {
     queryKey: ["/api/burnout/streaks"],
   });
 
+  // Only tasks that belong to today, not everything on the list.
   const openTasks =
-    activeTasksQ.data?.filter((t) => t.completed_at == null).length ?? 0;
+    activeTasksQ.data?.filter((t) => isOnToday(t, localIsoDate())).length ?? 0;
   const activeRuns =
     checklists.data?.filter((c) => !c.shipped).length ?? 0;
   const scriptCount = 8; // static reframes library size
@@ -276,8 +279,8 @@ function TodayInner({
           body="A working list, kept small. Add spoon estimates when it helps, skip them when it doesn't."
           status={
             openTasks === 0
-              ? "nothing on the list"
-              : `${openTasks} active ${openTasks === 1 ? "task" : "tasks"}`
+              ? "nothing on today's list"
+              : `${openTasks} for today`
           }
           loading={tasksLoading}
           testid="link-cross-tasks"

@@ -72,11 +72,12 @@ import {
 import { resolveRecurringInstances } from "@/lib/recurring-resolver";
 import { Link } from "wouter";
 import { addLocalDays, localIsoDate } from "@/lib/local-date";
+import { isMissed, matchesTimeframe, type Timeframe } from "@/lib/task-timeframe";
 
 type Filter = "active" | "missed" | "completed" | "archived" | "all";
 type MissedSubFilter = "all" | "recurring" | "non_recurring";
 type ArchiveTypeFilter = "all" | "recurring" | "non_recurring";
-type TimeframeFilter = "all" | "today" | "this_week" | "this_month";
+type TimeframeFilter = Timeframe;
 
 // Missed = task is incomplete AND is on a date that has already passed.
 // Per Session 3.3 decision (Option B):
@@ -88,67 +89,15 @@ type TimeframeFilter = "all" | "today" | "this_week" | "this_month";
 //     due_date AND due_bucket != 'today'. Tasks marked with due_bucket=
 //     'today' get rolled forward by Session 3.2's rollover at midnight,
 //     so they never accumulate here.
-function isMissed(task: TaskRow, todayIso: string): boolean {
-  if (task.completed_at != null) return false;
-  if (!task.due_date) return false;
-  if (task.due_date >= todayIso) return false;
-  if (task.recurring_template_id != null) return true;
-  // Non-recurring past-due task: only counted missed if it was pinned to
-  // a specific date, not the movable today bucket.
-  return task.due_bucket !== "today";
-}
-
-// Timeframe filter for Active view. Uses due_date + due_bucket. Buckets
-// map roughly to the same ranges Session 4 will use.
-function matchesTimeframe(
-  task: TaskRow,
-  tf: TimeframeFilter,
-  todayIso: string,
-): boolean {
-  if (tf === "all") return true;
-  const today = new Date(todayIso + "T00:00:00");
-  const dueDate = task.due_date
-    ? new Date(task.due_date + "T00:00:00")
-    : null;
-
-  if (tf === "today") {
-    if (task.due_bucket === "today") return true;
-    return dueDate?.getTime() === today.getTime();
-  }
-  if (tf === "this_week") {
-    if (task.due_bucket === "today" || task.due_bucket === "this_week") {
-      return true;
-    }
-    if (!dueDate) return false;
-    const endOfWeek = new Date(today);
-    // End-of-week = following Saturday. Week starts Sunday per app's
-    // convention.
-    endOfWeek.setDate(today.getDate() + (6 - today.getDay()));
-    return dueDate >= today && dueDate <= endOfWeek;
-  }
-  if (tf === "this_month") {
-    if (
-      task.due_bucket === "today" ||
-      task.due_bucket === "this_week" ||
-      task.due_bucket === "this_month"
-    ) {
-      return true;
-    }
-    if (!dueDate) return false;
-    return (
-      dueDate.getFullYear() === today.getFullYear() &&
-      dueDate.getMonth() === today.getMonth() &&
-      dueDate >= today
-    );
-  }
-  return true;
-}
+// isMissed and matchesTimeframe live in lib/task-timeframe.ts, shared
+// with Today and the spoon meter.
 
 const TIMEFRAME_LABEL: Record<TimeframeFilter, string> = {
-  all: "Any time",
   today: "Today",
   this_week: "This week",
+  next_week: "Next week",
   this_month: "This month",
+  all: "Any time",
 };
 
 // ---------- Task summary chips (below title, when values are present) ----------
@@ -1290,7 +1239,7 @@ export default function Tasks() {
   }, [templatesQ.data]);
 
   const [missedSub, setMissedSub] = useState<MissedSubFilter>("all");
-  const [timeframe, setTimeframe] = useState<TimeframeFilter>("all");
+  const [timeframe, setTimeframe] = useState<TimeframeFilter>("today");
   // Archive filter controls. Default: last 30 days, all types, no text.
   const [archiveType, setArchiveType] = useState<ArchiveTypeFilter>("all");
   const [archiveFrom, setArchiveFrom] = useState<string>(() => {
