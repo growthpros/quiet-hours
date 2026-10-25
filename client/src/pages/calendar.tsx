@@ -156,7 +156,7 @@ function DayColumn({
   const date = parts(day.iso);
   return (
     <div
-      className={`rounded-md border p-3 ${
+      className={`rounded-md border p-3 md:p-2 ${
         day.isToday ? "border-primary/50 bg-primary/5" : "border-border bg-card"
       } ${day.isPast ? "opacity-80" : ""}`}
       data-testid={`calendar-day-${day.iso}`}
@@ -188,14 +188,14 @@ function DayColumn({
         {day.upcoming.map((t) => (
           <div
             key={`upcoming-${t.id}`}
-            className="flex items-start gap-1 rounded border border-dashed border-border px-2 py-1.5"
+            className="rounded border border-dashed border-border px-1.5 py-1"
             title="This repeat becomes a task on the day."
             data-testid={`calendar-upcoming-${t.id}-${day.iso}`}
           >
-            <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-1 text-sm leading-snug text-foreground/80">
-                <Repeat className="h-3 w-3 shrink-0 text-muted-foreground" aria-label="Repeats" />
-                <span className="break-words">{t.title}</span>
+            <div className="min-w-0">
+              <p className="break-words text-xs leading-snug text-foreground/80">
+                <RepeatMark />
+                {t.title}
               </p>
               <p className="text-[11px] text-muted-foreground">
                 {[
@@ -218,12 +218,12 @@ function ItemRow({ item, template }: { item: DayItem; template: RecurringTemplat
   const spoons = task.spoon_estimate != null ? Number(task.spoon_estimate) : null;
   return (
     <div
-      className="flex items-start gap-1 rounded border border-border/60 bg-background px-2 py-1.5"
+      className="flex items-start gap-0.5 rounded border border-border/60 bg-background px-1.5 py-1"
       data-testid={`calendar-task-${task.id}`}
     >
       <div className="min-w-0 flex-1">
         <p
-          className={`flex items-center gap-1 text-sm leading-snug ${
+          className={`break-words text-xs leading-snug ${
             status === "done"
               ? "text-muted-foreground line-through decoration-muted-foreground/40"
               : status === "missed"
@@ -231,10 +231,8 @@ function ItemRow({ item, template }: { item: DayItem; template: RecurringTemplat
                 : "text-foreground"
           }`}
         >
-          {task.recurring_template_id != null && (
-            <Repeat className="h-3 w-3 shrink-0 text-muted-foreground" aria-label="Repeats" />
-          )}
-          <span className="break-words">{task.title}</span>
+          {task.recurring_template_id != null && <RepeatMark />}
+          {task.title}
         </p>
         {(spoons != null || status === "missed") && (
           <p className="text-[11px] text-muted-foreground">
@@ -244,7 +242,23 @@ function ItemRow({ item, template }: { item: DayItem; template: RecurringTemplat
           </p>
         )}
       </div>
-      {status !== "done" && <MoveTaskMenu task={task} template={template} />}
+      {status !== "done" && (
+        // A smaller Move button so it fits beside the title in a narrow day.
+        <div className="-mr-1 -mt-0.5 shrink-0 [&_button]:h-6 [&_button]:w-6 [&_svg]:h-3.5 [&_svg]:w-3.5">
+          <MoveTaskMenu task={task} template={template} />
+        </div>
+      )}
     </div>
+  );
+}
+
+// The repeat icon sits inline with the title, so long titles wrap under it
+// instead of leaving an empty column.
+function RepeatMark() {
+  return (
+    <Repeat
+      className="mr-1 inline h-3 w-3 align-[-2px] text-muted-foreground"
+      aria-label="Repeats"
+    />
   );
 }
