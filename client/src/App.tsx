@@ -23,6 +23,7 @@ import Foundation from "@/pages/foundation";
 import EarnBack from "@/pages/earn-back";
 import Delegation from "@/pages/delegation";
 import Tasks from "@/pages/tasks";
+import Calendar from "@/pages/calendar";
 import Recurring from "@/pages/recurring";
 import BrainDump from "@/pages/brain-dump";
 import GoodEnough from "@/pages/good-enough";
@@ -39,6 +40,7 @@ function AppRouter() {
       <Route path="/foundation" component={Foundation} />
       <Route path="/earn-back" component={EarnBack} />
       <Route path="/tasks" component={Tasks} />
+      <Route path="/calendar" component={Calendar} />
       <Route path="/recurring" component={Recurring} />
       <Route path="/brain-dump" component={BrainDump} />
       <Route path="/delegation" component={Delegation} />

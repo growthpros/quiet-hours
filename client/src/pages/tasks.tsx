@@ -5,7 +5,7 @@
 // estimated_hours prompts for actual_hours + reason so the AI can learn
 // how the user actually estimates over time.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -73,6 +73,8 @@ import { Link } from "wouter";
 import { addLocalDays, localIsoDate } from "@/lib/local-date";
 import { isMissed, matchesTimeframe, type Timeframe } from "@/lib/task-timeframe";
 import { MoveTaskMenu } from "@/components/move-task-menu";
+import { useWeekStart } from "@/lib/use-week-start";
+import { parseDateParam } from "@/lib/date-param";
 
 type Filter = "active" | "missed" | "completed" | "archived" | "all";
 type MissedSubFilter = "all" | "recurring" | "non_recurring";
@@ -1221,8 +1223,28 @@ export default function Tasks() {
   }, [templatesQ.data]);
 
   const [missedSub, setMissedSub] = useState<MissedSubFilter>("all");
-  const [timeframe, setTimeframe] = useState<TimeframeFilter>("today");
-  const [pickedDate, setPickedDate] = useState<string>(() => localIsoDate());
+  // A day tapped on the Calendar arrives as ?date=YYYY-MM-DD.
+  const [linkedDate] = useState(() =>
+    parseDateParam(window.location.search, window.location.hash),
+  );
+  const [timeframe, setTimeframe] = useState<TimeframeFilter>(
+    linkedDate ? "date" : "today",
+  );
+  const [pickedDate, setPickedDate] = useState<string>(
+    () => linkedDate ?? localIsoDate(),
+  );
+  // Clear the ?date= once it's been read, so it doesn't stick around and
+  // reapply the next time the Tasks page opens.
+  useEffect(() => {
+    if (window.location.search || window.location.hash.includes("?")) {
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.hash.replace(/\?.*$/, ""),
+      );
+    }
+  }, []);
+  const weekStartsOn = useWeekStart();
   // Archive filter controls. Default: last 30 days, all types, no text.
   const [archiveType, setArchiveType] = useState<ArchiveTypeFilter>("all");
   const [archiveFrom, setArchiveFrom] = useState<string>(() => {
@@ -1257,7 +1279,9 @@ export default function Tasks() {
       const active = nonArchivedRows.filter(
         (r) => r.completed_at == null && !isMissed(r, today),
       );
-      return active.filter((r) => matchesTimeframe(r, timeframe, today));
+      return active.filter((r) =>
+        matchesTimeframe(r, timeframe, today, undefined, weekStartsOn),
+      );
     }
     if (filter === "missed") {
       const missed = nonArchivedRows.filter((r) => isMissed(r, today));
@@ -1309,6 +1333,7 @@ export default function Tasks() {
     timeframe,
     pickedDate,
     today,
+    weekStartsOn,
     archiveType,
     archiveFrom,
     archiveTo,

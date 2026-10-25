@@ -48,6 +48,8 @@ export type CheckinCadence =
   | "every_3h"
   | "custom";
 
+export type WeekStart = 0 | 1 | 6;
+
 export interface UserProfileRow {
   user_id: string;
   diagnosis:
@@ -72,6 +74,8 @@ export interface UserProfileRow {
   seeded_pillars: boolean;
   checkin_cadence: CheckinCadence;
   checkin_cadence_minutes: number | null;
+  // Which day the week starts: 0 Sunday, 1 Monday, 6 Saturday (migration 014).
+  week_starts_on: WeekStart;
   created_at: number;
   updated_at: number;
 }
@@ -124,6 +128,7 @@ export async function updateProfile(
       | "seeded_pillars"
       | "checkin_cadence"
       | "checkin_cadence_minutes"
+      | "week_starts_on"
     >
   >,
 ): Promise<UserProfileRow> {
