@@ -75,12 +75,28 @@ export function groupWeek(
   weeksAhead = 0,
   templates: RecurringTemplateRow[] = [],
 ): CalendarWeek {
-  const live = tasks.filter((t) => t.archived_at == null);
   const { start, end } = weekRange(todayIso, weeksAhead, weekStartsOn);
-  const upcomingByDay = upcomingRepeats(templates, tasks, todayIso, start, end);
+  return {
+    start,
+    end,
+    days: groupDays(tasks, todayIso, start, end, templates),
+    unscheduled: groupUnscheduled(tasks),
+  };
+}
 
-  const days: CalendarDay[] = Array.from({ length: 7 }, (_, i) => {
-    const iso = isoAddDays(start, i);
+// Every day from start to end (inclusive), with its tasks and upcoming
+// repeats. Shared by the week and month views.
+export function groupDays(
+  tasks: TaskRow[],
+  todayIso: string,
+  start: string,
+  end: string,
+  templates: RecurringTemplateRow[] = [],
+): CalendarDay[] {
+  const live = tasks.filter((t) => t.archived_at == null);
+  const upcomingByDay = upcomingRepeats(templates, tasks, todayIso, start, end);
+  const days: CalendarDay[] = [];
+  for (let iso = start; iso <= end; iso = isoAddDays(iso, 1)) {
     const isToday = iso === todayIso;
     const onDay = live.filter((t) => {
       const carriedToToday =
@@ -95,7 +111,7 @@ export function groupWeek(
       .sort((a, b) => rank(a.status) - rank(b.status));
     const open = items.filter((i) => i.status === "open").map((i) => i.task);
     const upcoming = upcomingByDay.get(iso) ?? [];
-    return {
+    days.push({
       iso,
       isToday,
       isPast: iso < todayIso,
@@ -106,22 +122,67 @@ export function groupWeek(
         sum(open, (t) => t.spoon_estimate) + sum(upcoming, (t) => t.spoon_estimate),
       openHours:
         sum(open, (t) => t.estimated_hours) + sum(upcoming, (t) => t.estimated_hours),
-    };
-  });
+    });
+  }
+  return days;
+}
 
+// Tasks with a timeframe but no day, in timeframe order.
+export function groupUnscheduled(tasks: TaskRow[]): CalendarWeek["unscheduled"] {
   const groups = new Map<UnscheduledGroup, TaskRow[]>();
-  for (const t of live) {
-    if (t.completed_at != null || t.due_date) continue;
+  for (const t of tasks) {
+    if (t.archived_at != null || t.completed_at != null || t.due_date) continue;
     if (t.due_bucket === "today") continue; // shown on today's day
     const group: UnscheduledGroup = t.due_bucket ?? "anytime";
     groups.set(group, [...(groups.get(group) ?? []), t]);
   }
-  const unscheduled = UNSCHEDULED_ORDER.filter((g) => groups.has(g)).map((group) => ({
+  return UNSCHEDULED_ORDER.filter((g) => groups.has(g)).map((group) => ({
     group,
     tasks: groups.get(group)!,
   }));
+}
 
-  return { start, end, days, unscheduled };
+export interface MonthCell {
+  day: CalendarDay;
+  inMonth: boolean;
+}
+
+export interface CalendarMonth {
+  /** First and last day of the month itself. */
+  start: string;
+  end: string;
+  /** Whole weeks covering the month, for the person's week start. */
+  weeks: MonthCell[][];
+}
+
+// The month holding anchorIso, laid out in whole weeks.
+export function groupMonth(
+  tasks: TaskRow[],
+  todayIso: string,
+  anchorIso: string,
+  weekStartsOn: WeekStartDay = 0,
+  templates: RecurringTemplateRow[] = [],
+): CalendarMonth {
+  const start = `${anchorIso.slice(0, 7)}-01`;
+  const [y, m] = anchorIso.split("-").map(Number);
+  const end = `${anchorIso.slice(0, 7)}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+  const gridStart = weekRange(start, 0, weekStartsOn).start;
+  const gridEnd = weekRange(end, 0, weekStartsOn).end;
+  const days = groupDays(tasks, todayIso, gridStart, gridEnd, templates);
+  const weeks: MonthCell[][] = [];
+  for (let i = 0; i < days.length; i += 7) {
+    weeks.push(
+      days.slice(i, i + 7).map((day) => ({ day, inMonth: day.iso >= start && day.iso <= end })),
+    );
+  }
+  return { start, end, weeks };
+}
+
+/** Month offset of a date from today's month (for the month arrows). */
+export function addMonths(iso: string, n: number): string {
+  const [y, m] = iso.split("-").map(Number);
+  const total = y * 12 + (m - 1) + n;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}-01`;
 }
 
 // How many weeks ahead (or back, if negative) the week holding dateIso is

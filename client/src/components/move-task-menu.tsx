@@ -3,7 +3,6 @@
 // occurrence (see lib/task-move.ts).
 
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,10 +21,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ToastAction } from "@/components/ui/toast";
-import { useToast } from "@/hooks/use-toast";
+import { useTaskMover } from "@/hooks/use-task-mover";
 import { localIsoDate } from "@/lib/local-date";
-import { moveTask, type TaskRow } from "@/lib/tasks-data";
+import type { TaskRow } from "@/lib/tasks-data";
 import type { RecurringTemplateRow } from "@/lib/recurring-data";
 import {
   MOVE_CHOICES,
@@ -37,7 +35,6 @@ import {
   whenForDate,
   whenForRepeatChoice,
   type MoveChoice,
-  type When,
 } from "@/lib/task-move";
 
 export function MoveTaskMenu({
@@ -49,8 +46,6 @@ export function MoveTaskMenu({
   template: RecurringTemplateRow | null;
   variant?: "icon" | "text";
 }) {
-  const qc = useQueryClient();
-  const { toast } = useToast();
   const [picking, setPicking] = useState(false);
   const [pickedDate, setPickedDate] = useState("");
   const today = localIsoDate();
@@ -66,47 +61,7 @@ export function MoveTaskMenu({
   const minDate = isRepeat ? window?.earliest : today;
   const maxDate = isRepeat ? window?.latest : undefined;
 
-  const move = useMutation({
-    mutationFn: async (to: When) => ({ to, previous: await moveTask(task, to) }),
-    onSuccess: ({ to, previous }) => {
-      qc.invalidateQueries({ queryKey: ["tasks"] });
-      qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
-      toast({
-        title: `Moved to ${describeWhen(to, today)}.`,
-        action: (
-          <ToastAction
-            altText="Undo the move"
-            onClick={() => undo.mutate(previous)}
-            data-testid={`button-undo-move-${task.id}`}
-          >
-            Undo
-          </ToastAction>
-        ),
-      });
-    },
-    onError: (e) => {
-      toast({
-        title: "Couldn't move it",
-        description: e instanceof Error ? e.message : String(e),
-      });
-    },
-  });
-
-  const undo = useMutation({
-    mutationFn: async (previous: When) =>
-      moveTask({ id: task.id, due_date: null, due_bucket: null }, previous),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["tasks"] });
-      qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
-      toast({ title: "Put back where it was." });
-    },
-    onError: (e) => {
-      toast({
-        title: "Couldn't undo",
-        description: e instanceof Error ? e.message : String(e),
-      });
-    },
-  });
+  const { moveTo, isMoving } = useTaskMover();
 
   // A repeat with nowhere to go (for example a daily repeat) gets no menu.
   if (isRepeat && (!template || !window)) return null;
@@ -116,7 +71,7 @@ export function MoveTaskMenu({
       isRepeat && (choice === "today" || choice === "tomorrow")
         ? whenForRepeatChoice(choice, today)
         : whenForChoice(choice, today);
-    move.mutate(to);
+    moveTo(task, to);
   };
 
   const pickedIsValid =
@@ -134,7 +89,7 @@ export function MoveTaskMenu({
               variant="ghost"
               aria-label="Move"
               title="Move to another day"
-              disabled={move.isPending}
+              disabled={isMoving}
               data-testid={`button-task-move-${task.id}`}
             >
               <CalendarClock className="h-4 w-4" />
@@ -142,7 +97,7 @@ export function MoveTaskMenu({
           ) : (
             <button
               type="button"
-              disabled={move.isPending}
+              disabled={isMoving}
               className="italic text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
               data-testid={`button-task-move-${task.id}`}
             >
@@ -199,9 +154,9 @@ export function MoveTaskMenu({
               Cancel
             </Button>
             <Button
-              disabled={!pickedIsValid || move.isPending}
+              disabled={!pickedIsValid || isMoving}
               onClick={() => {
-                move.mutate(whenForDate(pickedDate));
+                moveTo(task, whenForDate(pickedDate));
                 setPicking(false);
               }}
               data-testid={`button-move-date-confirm-${task.id}`}

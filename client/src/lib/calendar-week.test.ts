@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { groupWeek, weeksAheadFor } from "@/lib/calendar-week";
+import { addMonths, groupMonth, groupWeek, weeksAheadFor } from "@/lib/calendar-week";
 import type { TaskRow } from "@/lib/tasks-data";
 import type { RecurringTemplateRow } from "@/lib/recurring-data";
 
@@ -152,5 +152,54 @@ describe("weeksAheadFor", () => {
   });
   it("works across the change from daylight time", () => {
     expect(weeksAheadFor("2026-10-28", "2026-11-04")).toBe(1);
+  });
+});
+
+describe("groupMonth", () => {
+  // Today is Wednesday, Oct 21, 2026. Oct 1 is a Thursday, Oct 31 a Saturday.
+  it("covers the month in whole weeks for the week start", () => {
+    const sun = groupMonth([], TODAY, TODAY, 0);
+    expect(sun.start).toBe("2026-10-01");
+    expect(sun.end).toBe("2026-10-31");
+    expect(sun.weeks.length).toBe(5);
+    expect(sun.weeks[0][0].day.iso).toBe("2026-09-27");
+    expect(sun.weeks[0][0].inMonth).toBe(false);
+    expect(sun.weeks[4][6].day.iso).toBe("2026-10-31");
+
+    const mon = groupMonth([], TODAY, TODAY, 1);
+    expect(mon.weeks[0][0].day.iso).toBe("2026-09-28");
+    expect(mon.weeks.at(-1)!.at(-1)!.day.iso).toBe("2026-11-01");
+    expect(mon.weeks.at(-1)!.at(-1)!.inMonth).toBe(false);
+  });
+
+  it("puts tasks and upcoming repeats on their days, same as the week view", () => {
+    const tasks = [
+      task({ title: "Today bucket", due_bucket: "today", spoon_estimate: 2 }),
+      task({ title: "Friday", due_date: "2026-10-23", spoon_estimate: 3 }),
+      task({ title: "November", due_date: "2026-11-01" }),
+    ];
+    const tueThu = template({ id: 70, title: "Tue/Thu" });
+    const month = groupMonth(tasks, TODAY, "2026-10-05", 0, [tueThu]);
+    const day = (iso: string) => month.weeks.flat().find((c) => c.day.iso === iso)!.day;
+    expect(day(TODAY).items.map((i) => i.task.title)).toEqual(["Today bucket"]);
+    expect(day("2026-10-23").openSpoons).toBe(3);
+    expect(day("2026-10-22").upcoming.map((t) => t.title)).toEqual(["Tue/Thu"]);
+    expect(day("2026-10-27").upcoming.map((t) => t.title)).toEqual(["Tue/Thu"]);
+    // Nov 1 is outside a Sunday-start October grid
+    expect(month.weeks.flat().some((c) => c.day.iso === "2026-11-01")).toBe(false);
+  });
+
+  it("handles February in a leap year", () => {
+    const feb = groupMonth([], TODAY, "2028-02-14", 0);
+    expect(feb.end).toBe("2028-02-29");
+  });
+});
+
+describe("addMonths", () => {
+  it("moves to the first of another month, across years", () => {
+    expect(addMonths("2026-10-21", 1)).toBe("2026-11-01");
+    expect(addMonths("2026-12-05", 1)).toBe("2027-01-01");
+    expect(addMonths("2026-01-31", -1)).toBe("2025-12-01");
+    expect(addMonths("2026-10-21", 0)).toBe("2026-10-01");
   });
 });
