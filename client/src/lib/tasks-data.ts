@@ -4,7 +4,6 @@
 
 import { supabase } from "@/lib/supabase";
 import { addLocalDays, localIsoDate, startOfLocalDay } from "@/lib/local-date";
-import { committedSpoonsToday } from "@/lib/task-timeframe";
 
 // ---------- Row shapes ----------
 
@@ -108,6 +107,16 @@ export interface CreateTaskInput {
   projectId?: number | null;
 }
 
+// A new task has one answer to "when": a timeframe or a specific day, never
+// both. With neither, it goes on Today.
+export function newTaskBucket(input: {
+  dueDate?: string | null;
+  dueBucket?: DueBucket | null;
+}): DueBucket | null {
+  if (input.dueDate) return null;
+  return input.dueBucket ?? "today";
+}
+
 export async function createTask(input: CreateTaskInput): Promise<TaskRow> {
   const user_id = await requireUserId();
   const now = Date.now();
@@ -121,7 +130,7 @@ export async function createTask(input: CreateTaskInput): Promise<TaskRow> {
       estimated_hours: input.estimatedHours ?? null,
       complexity: input.complexity ?? null,
       due_date: input.dueDate ?? null,
-      due_bucket: input.dueBucket ?? "today", // Default to today
+      due_bucket: newTaskBucket(input),
       billable: input.billable ?? false,
       client_id: input.clientId ?? null,
       project_id: input.projectId ?? null,
@@ -195,25 +204,6 @@ export async function updateTask(
 export async function deleteTask(id: number): Promise<void> {
   const { error } = await supabase.from("tasks").delete().eq("id", id);
   if (error) throw error;
-}
-
-// ---------- Committed-spoons helper ----------
-// Sum of spoon_estimate across incomplete tasks. Used to decide whether
-// adding a new task would push today past budget.
-// Spoons already committed today, used by the budget check when adding a
-// task. Only today's unfinished tasks count (see task-timeframe.ts).
-export async function committedSpoonsFromTasks(): Promise<number> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select(
-      "spoon_estimate, completed_at, archived_at, due_date, due_bucket, recurring_template_id",
-    )
-    .is("completed_at", null);
-  if (error) throw error;
-  return committedSpoonsToday(
-    (data ?? []) as Parameters<typeof committedSpoonsToday>[0],
-    localIsoDate(),
-  );
 }
 
 // ---------- Brain Dump ----------

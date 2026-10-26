@@ -45,6 +45,9 @@ Checked: tests, test database run, preview, live check.
 | 2026-10-25 | The phone check for month view and dragging happens on the live app after merging, because signing in to previews on a phone was blocked (see the entry for #34). | Caroline |
 | 2026-10-25 | US only at launch. | Caroline |
 | 2026-10-25 | This build log lives in the code and is updated with every pull request. | Caroline |
+| 2026-10-25 | Spoon totals recalculate when tasks move in or out of Today, and moving or dragging a task onto Today checks the budget, the same as adding one. | Caroline |
+| 2026-10-25 | Future days are compared with "your usual" (the middle of the last 14 check-in budgets); each day's real budget still comes from that morning's check-in. | Caroline |
+| 2026-10-25 | The spoon numbers (daily budget formula, task costs, earn-back values) get researched before they're changed. | Caroline |
 
 ## History
 
@@ -232,6 +235,34 @@ No change. The AI feature runs as a Supabase Edge Function, so the live copy onl
 **Checked:**
 A search of the code finds no other mention. No test added: the change is wording inside the AI's instructions, and a test that searched for the procedure's name would have to name it.
 
+### 2026-10-25: Spoon budget rules and amber days (Phase 1, step 6)
+
+**What and why:**
+Comparing the code with spec v3 and the Round 2 answers showed the over-budget rules weren't working as intended:
+
+- With no check-in yet, there was no budget, so the over-budget prompt never appeared.
+- The add-task check left out spoons from tasks finished today.
+- Only adding a task checked the budget; moving or dragging one onto Today didn't.
+- The repeated-override pause appeared on the 4th override instead of the 3rd.
+- New tasks with a specific date also got the Today timeframe, breaking the "one answer to when" rule.
+
+What changed:
+
+- New `lib/spoon-budget.ts`: today's budget is the check-in plus earned back, or "your usual" before the check-in; spent today includes finished tasks; one function decides how far over a change would go.
+- The over-budget prompt now appears when adding, moving or dragging a task onto Today. It offers "Move to tomorrow instead" first, plus "Make it smaller" when adding, then the reasons as before. The pause comes on what would be the 3rd override in 7 days.
+- Calendar days that go over get a soft amber tint and a line like "About 13 of your usual 9.5 spoons." Past days get no amber.
+- New tasks with a date no longer also get the Today timeframe.
+- Before the morning check-in, Today's spoon meter says the app is planning with "your usual" and invites the check-in for today's real number.
+
+**Decisions:**
+See the Decisions table (recalculating on moves, "your usual," researching the numbers).
+
+**Database:**
+No change.
+
+**Checked:**
+127 tests, including the new budget rules and new-task timeframes. In a real browser against the test database: amber on an over day; dragging onto a full Today opened the prompt, "Move to tomorrow instead" moved it to tomorrow, and keeping it logged the override and turned Today amber; adding a task counted the spoons finished earlier; "Move to tomorrow instead" when adding saved a date with no timeframe; the pause appeared on the 3rd override.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
@@ -246,4 +277,6 @@ Things noticed along the way that aren't scheduled yet:
 - The Archived filter on the Tasks page compares dates using UTC. It's minor, but it should use the local date like everything else.
 - The two or three early-look testers are still to be chosen.
 - The test database has no Edge Functions (and no Anthropic key), so AI brain dump sorting and task breakdown don't work on previews.
-- Spoon numbers (the daily budget formula, task costs and earn-back values) were invented in the original build. Research is under way, and a spoon model step will follow before subtasks.
+- Spoon numbers (the daily budget formula, task costs and earn-back values) were invented in the original build. The research is done (Caroline's Claude doc "Quiet Hours Spoon Research v1"), and a spoon model step follows before subtasks.
+- Not built yet from the spoon rules in spec v3: the 2nd-override heads-up, "Talk it through" and the link to the last crash in the pause, phases changing Foundation, the hours meter, and the two check-in safety rules. "Make it smaller" for moved tasks waits for subtasks.
+- Task breakdown still creates its steps with both a date and a timeframe; subtasks (Phase 2) replace it.

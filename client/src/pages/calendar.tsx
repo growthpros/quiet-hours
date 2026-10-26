@@ -29,6 +29,8 @@ import { listRecurringTemplates, type RecurringTemplateRow } from "@/lib/recurri
 import { localIsoDate } from "@/lib/local-date";
 import { canDropOn, dropRange, isoAddDays, whenForDate, type DropRange } from "@/lib/task-move";
 import { useTaskMover } from "@/hooks/use-task-mover";
+import { useSpoonBudget } from "@/lib/use-spoon-budget";
+import { dayBudget, type DayBudget } from "@/lib/spoon-budget";
 import { clearAddressQuery, parseDateParam } from "@/lib/date-param";
 import { useWeekStart } from "@/lib/use-week-start";
 import {
@@ -78,11 +80,24 @@ interface ActiveDrag {
   range: DropRange | null;
 }
 
-// What dragging shares with each day and task on the page.
+// What the page shares with each day and task: dragging, and each day's
+// spoons compared with its budget.
 interface DragState {
   active: ActiveDrag | null;
   templatesById: Map<number, RecurringTemplateRow>;
+  budgetFor: (day: CalendarDay) => DayBudget | null;
 }
+
+// The Alert accent from the design (spec v3): warm amber, never red.
+const AMBER = "#D9A55E";
+
+function budgetLine(b: DayBudget): string {
+  const whose = b.basis === "checkin" ? "today's" : "your usual";
+  return `About ${fmt(b.load)} of ${whose} ${fmt(b.budget)} spoons`;
+}
+
+const USUAL_EXPLAINED =
+  "Your usual is the middle of your last 14 check-in budgets (12 until you've checked in a few times). Each day's real budget comes from that morning's check-in.";
 
 export default function Calendar() {
   const today = localIsoDate();
@@ -121,7 +136,7 @@ export default function Calendar() {
   );
 
   // ---------- Dragging ----------
-  const { moveTo } = useTaskMover();
+  const { moveTo, overrideDialog } = useTaskMover();
   const [active, setActive] = useState<ActiveDrag | null>(null);
   // A drop can be followed by a click on the day underneath; ignore it so a
   // drop in the month view doesn't also open that week.
@@ -148,7 +163,9 @@ export default function Calendar() {
     if (!drag || !iso || !canDropOn(drag.range, iso)) return;
     // Already on that day: nothing to do.
     if (drag.task.due_date === iso && drag.task.due_bucket == null) return;
-    moveTo(drag.task, whenForDate(iso));
+    moveTo(drag.task, whenForDate(iso), {
+      canMoveTomorrow: canDropOn(drag.range, isoAddDays(today, 1)),
+    });
   };
 
   const announcements: Announcements = {
@@ -161,7 +178,9 @@ export default function Calendar() {
     onDragCancel: () => "Put back.",
   };
 
-  const drag: DragState = { active, templatesById };
+  const { ledger, usual } = useSpoonBudget();
+  const budgetFor = (day: CalendarDay) => dayBudget(day, tasksQ.data ?? [], ledger, usual);
+  const drag: DragState = { active, templatesById, budgetFor };
 
   return (
     <div className="space-y-6">
@@ -281,6 +300,8 @@ export default function Calendar() {
             )}
           </section>
 
+          {overrideDialog}
+
           <DragOverlay dropAnimation={null}>
             {active ? (
               <div className="max-w-[14rem] rounded border border-primary/40 bg-background px-2 py-1 text-xs shadow-md">
@@ -304,6 +325,7 @@ function DropDay({
   children,
   testId,
   onClick,
+  over,
 }: {
   iso: string;
   drag: DragState;
@@ -311,6 +333,8 @@ function DropDay({
   children: ReactNode;
   testId: string;
   onClick?: () => void;
+  /** Over its spoons: a soft amber tint, never red. */
+  over?: boolean;
 }) {
   const allowed = drag.active ? canDropOn(drag.active.range, iso) : true;
   const { setNodeRef, isOver } = useDroppable({ id: `day-${iso}`, data: { iso }, disabled: !allowed });
@@ -321,7 +345,9 @@ function DropDay({
       className={`${className} transition-opacity ${drag.active && !allowed ? "opacity-35" : ""} ${
         isOver && allowed ? "ring-2 ring-primary/40" : ""
       }`}
+      style={over ? { borderColor: AMBER, backgroundColor: `${AMBER}1F` } : undefined}
       data-testid={testId}
+      data-over={over ? "true" : undefined}
       data-drop-allowed={drag.active ? String(allowed) : undefined}
     >
       {children}
@@ -411,14 +437,16 @@ function MonthCell({
     day.upcoming.length;
   const shown = titled.slice(0, 3);
   const more = titled.length - shown.length;
+  const b = drag.budgetFor(day);
   return (
     <DropDay
       iso={day.iso}
       drag={drag}
+      over={b?.over}
       onClick={() => onOpenWeek(day.iso)}
       testId={`month-day-${day.iso}`}
       className={`min-h-[3.25rem] min-w-0 cursor-pointer overflow-hidden rounded-md border p-1 text-left md:min-h-[7.5rem] md:p-1.5 ${
-        day.isToday ? "border-primary/50 bg-primary/5" : "border-border bg-card hover:bg-muted/40"
+        b?.over ? "" : day.isToday ? "border-primary/50 bg-primary/5" : "border-border bg-card hover:bg-muted/40"
       } ${inMonth ? "" : "opacity-50"}`}
     >
       <div className="flex flex-col gap-0.5 md:flex-row md:items-baseline md:justify-between md:gap-1">
@@ -431,14 +459,20 @@ function MonthCell({
         {/* Phone: a dot with the count instead of titles */}
         {day.openCount > 0 && (
           <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground md:hidden">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary/60" />
+            <span
+              className={`inline-block h-1.5 w-1.5 rounded-full ${b?.over ? "" : "bg-primary/60"}`}
+              style={b?.over ? { backgroundColor: AMBER } : undefined}
+            />
             {day.openCount}
           </span>
         )}
       </div>
       <div className="hidden md:block">
-        <p className="min-h-[0.875rem] text-[10px] italic leading-tight text-muted-foreground">
-          {day.openCount > 0 ? daySummary(day) : ""}
+        <p
+          className="min-h-[0.875rem] text-[10px] italic leading-tight text-muted-foreground"
+          title={b?.over ? `${budgetLine(b)}. ${b.basis === "usual" ? USUAL_EXPLAINED : ""}` : undefined}
+        >
+          {day.openCount > 0 ? (b?.over ? budgetLine(b) : daySummary(day)) : ""}
         </p>
         <div className="mt-1 space-y-0.5">
           {shown.map((item) => (
@@ -479,13 +513,15 @@ function MonthChip({ item, drag }: { item: DayItem; drag: DragState }) {
 
 function DayColumn({ day, drag }: { day: CalendarDay; drag: DragState }) {
   const date = parts(day.iso);
+  const b = drag.budgetFor(day);
   return (
     <DropDay
       iso={day.iso}
       drag={drag}
       testId={`calendar-day-${day.iso}`}
+      over={b?.over}
       className={`rounded-md border p-3 md:p-2 ${
-        day.isToday ? "border-primary/50 bg-primary/5" : "border-border bg-card"
+        b?.over ? "" : day.isToday ? "border-primary/50 bg-primary/5" : "border-border bg-card"
       } ${day.isPast && !drag.active ? "opacity-80" : ""}`}
     >
       <Link
@@ -499,7 +535,18 @@ function DayColumn({ day, drag }: { day: CalendarDay; drag: DragState }) {
         </p>
         <p className="font-serif text-lg text-foreground">{date.getDate()}</p>
       </Link>
-      <p className="mb-2 min-h-[1rem] text-xs italic text-muted-foreground">{daySummary(day)}</p>
+      <p className="min-h-[1rem] text-xs italic text-muted-foreground">{daySummary(day)}</p>
+      {b?.over ? (
+        <p
+          className="mb-2 text-[11px] leading-snug text-foreground/80"
+          title={b.basis === "usual" ? USUAL_EXPLAINED : "Today's budget comes from this morning's check-in, plus any spoons earned back."}
+          data-testid={`over-${day.iso}`}
+        >
+          {budgetLine(b)}
+        </p>
+      ) : (
+        <div className="mb-2" />
+      )}
       <div className="space-y-1.5">
         {day.items.map((item) => (
           <ItemRow key={item.task.id} item={item} drag={drag} />

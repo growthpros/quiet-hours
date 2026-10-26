@@ -4,15 +4,22 @@
 // The task list updates right away (an "optimistic" update) so a dragged
 // task doesn't snap back while the save finishes. If the save fails, the
 // list goes back to how it was and a message says so.
+//
+// Moving a task onto Today checks today's spoons first (lib/spoon-budget.ts).
+// If it would go over, the over-budget prompt opens instead, so callers
+// must render the `overrideDialog` this hook returns.
 
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ToastAction } from "@/components/ui/toast";
+import { OverrideModal } from "@/components/override-modal";
 import { useToast } from "@/hooks/use-toast";
 import { localIsoDate } from "@/lib/local-date";
 import { moveTask, type TaskRow } from "@/lib/tasks-data";
-import { describeWhen, type When } from "@/lib/task-move";
-
-type MovableTask = Pick<TaskRow, "id" | "due_date" | "due_bucket">;
+import { describeWhen, isoAddDays, whenForDate, type When } from "@/lib/task-move";
+import { isOnToday } from "@/lib/task-timeframe";
+import { spoonsOverIfAdded } from "@/lib/spoon-budget";
+import { useSpoonBudget } from "@/lib/use-spoon-budget";
 
 function applyWhen(rows: TaskRow[] | undefined, id: number, to: When): TaskRow[] | undefined {
   return rows?.map((r) =>
@@ -20,9 +27,23 @@ function applyWhen(rows: TaskRow[] | undefined, id: number, to: When): TaskRow[]
   );
 }
 
+interface PendingMove {
+  task: TaskRow;
+  to: When;
+  over: number;
+  canMoveTomorrow: boolean;
+}
+
+export interface MoveOptions {
+  /** Whether "Move to tomorrow instead" can be offered (repeats may not move there). */
+  canMoveTomorrow?: boolean;
+}
+
 export function useTaskMover() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { ledger, usual } = useSpoonBudget();
+  const [pending, setPending] = useState<PendingMove | null>(null);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["tasks"] });
@@ -47,7 +68,7 @@ export function useTaskMover() {
   });
 
   const move = useMutation({
-    mutationFn: async ({ task, to }: { task: MovableTask; to: When }) => ({
+    mutationFn: async ({ task, to }: { task: TaskRow; to: When }) => ({
       to,
       previous: await moveTask(task, to),
     }),
@@ -78,8 +99,47 @@ export function useTaskMover() {
     onSettled: refresh,
   });
 
-  return {
-    moveTo: (task: MovableTask, to: When) => move.mutate({ task, to }),
-    isMoving: move.isPending,
+  const moveTo = (task: TaskRow, to: When, opts: MoveOptions = {}) => {
+    const today = localIsoDate();
+    const landsOnToday = to.dueDate === today || to.dueBucket === "today";
+    const spoons = task.spoon_estimate != null ? Number(task.spoon_estimate) : 0;
+    // Only a task arriving on Today adds to Today's load.
+    if (landsOnToday && task.completed_at == null && !isOnToday(task, today) && spoons > 0) {
+      const tasks = qc.getQueryData<TaskRow[]>(["tasks"]) ?? [];
+      const over = spoonsOverIfAdded(tasks, ledger, usual, today, spoons);
+      if (over > 0) {
+        setPending({
+          task,
+          to,
+          over,
+          canMoveTomorrow: opts.canMoveTomorrow ?? task.recurring_template_id == null,
+        });
+        return;
+      }
+    }
+    move.mutate({ task, to });
   };
+
+  const overrideDialog = (
+    <OverrideModal
+      open={pending !== null}
+      spoonsOver={pending?.over ?? 0}
+      action="move"
+      onCancel={() => setPending(null)}
+      onConfirmed={() => {
+        if (pending) move.mutate({ task: pending.task, to: pending.to });
+        setPending(null);
+      }}
+      onMoveTomorrow={
+        pending?.canMoveTomorrow
+          ? () => {
+              move.mutate({ task: pending.task, to: whenForDate(isoAddDays(localIsoDate(), 1)) });
+              setPending(null);
+            }
+          : undefined
+      }
+    />
+  );
+
+  return { moveTo, isMoving: move.isPending, overrideDialog };
 }

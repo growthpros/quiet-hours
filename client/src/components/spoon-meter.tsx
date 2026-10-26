@@ -56,6 +56,7 @@ export function SpoonMeter() {
   const qc = useQueryClient();
   const [showEarnPanel, setShowEarnPanel] = useState(false);
   const { date, isToday } = useViewingDate();
+  const { usual } = useSpoonBudget();
 
   const ledgerQ = useQuery<SpoonLedgerRow>({
     queryKey: ["/api/spoon/ledger", date],
@@ -202,7 +203,7 @@ export function SpoonMeter() {
               >
                 {noAllotment
                   ? isToday
-                    ? "Do a morning check-in to see today's allotment."
+                    ? `Until you check in, plans use your usual ${usual} spoons. A check-in sets today's real number from how you are right now.`
                     : "No allotment was issued this day. It happens when you skip the morning check-in."
                   : "How much energy you had, and how much was spoken for."}
               </p>
@@ -416,6 +417,7 @@ import {
 } from "@/components/ui/dialog";
 import { committedSpoonsToday } from "@/lib/task-timeframe";
 import { localIsoDate } from "@/lib/local-date";
+import { useSpoonBudget } from "@/lib/use-spoon-budget";
 
 interface EarnBackPanelProps {
   actions: EarnBackActionRow[];

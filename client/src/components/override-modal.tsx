@@ -1,11 +1,9 @@
-// Override modal: fired when a user tries to add commitments that would
-// push them past today's spoon limit. Captures a category, always prompts
-// for free text (framed with the value-exchange language), and logs the
-// override event. When 3+ overrides land within 7 days, a compassionate
-// soft interrupt is surfaced before the modal on the next trigger.
-//
-// Session 2 ships the component and the hook. Session 3 (tasks) wires it
-// up to the actual add-task flow.
+// Override modal: shown when adding a task to Today, or moving or dragging
+// one onto Today, would go past today's spoons. It never blocks. It offers
+// two gentler choices first (move it to tomorrow, or make it smaller), then
+// "sometimes you know best": a reason, optional free text, and the override
+// is logged. On what would be the 3rd override in 7 days, a soft interrupt
+// comes first (spec v3, section 5).
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -38,9 +36,29 @@ interface OverrideModalProps {
   spoonsOver: number;
   onCancel: () => void;
   onConfirmed: () => void; // called after the override is logged, so caller can commit whatever they were adding
+  /** Offer "Move to tomorrow instead" (hidden when there's no handler). */
+  onMoveTomorrow?: () => void;
+  /** Offer "Make it smaller" (hidden when there's no handler). */
+  onMakeSmaller?: () => void;
+  /** What confirming does: "add" (default) or "move". */
+  action?: "add" | "move";
 }
 
-export function OverrideModal({ open, spoonsOver, onCancel, onConfirmed }: OverrideModalProps) {
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+export function OverrideModal({
+  open,
+  spoonsOver,
+  onCancel,
+  onConfirmed,
+  onMoveTomorrow,
+  onMakeSmaller,
+  action = "add",
+}: OverrideModalProps) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -78,10 +96,26 @@ export function OverrideModal({ open, spoonsOver, onCancel, onConfirmed }: Overr
     },
   });
 
-  // Soft interrupt: 3+ overrides in last 7 days, but only on first entry.
+  // Soft interrupt: this would be the 3rd (or later) override in 7 days,
+  // shown only on first entry.
   // Once the user has clicked 'Still override', they've acknowledged the
   // pattern and shouldn't be re-blocked on this same modal instance.
-  const showSoftInterrupt = step === "choose" && (priorQ.data ?? 0) >= 3;
+  const prior = priorQ.data ?? 0;
+  const showSoftInterrupt = step === "choose" && prior >= 2;
+  const gentler = (onMoveTomorrow || onMakeSmaller) && (
+    <div className="flex flex-wrap gap-2">
+      {onMoveTomorrow && (
+        <Button variant="outline" onClick={onMoveTomorrow} data-testid="override-move-tomorrow">
+          Move to tomorrow instead
+        </Button>
+      )}
+      {onMakeSmaller && (
+        <Button variant="outline" onClick={onMakeSmaller} data-testid="override-make-smaller">
+          Make it smaller
+        </Button>
+      )}
+    </div>
+  );
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
@@ -101,28 +135,33 @@ export function OverrideModal({ open, spoonsOver, onCancel, onConfirmed }: Overr
               <AlertTriangle className="h-5 w-5 mt-0.5" style={{ color: "#8A5A1F" }} />
               <div>
                 <p className="text-sm font-semibold" style={{ color: "#8A5A1F" }}>
-                  You've overridden your spoon limit {priorQ.data} times this week.
+                  This would be your {ordinal(prior + 1)} override this week.
                 </p>
                 <p className="text-sm mt-1 font-serif" style={{ color: "#3D3A34" }}>
-                  That's the pattern, not the plan. A third override is usually where the crash begins. Want to look at what's been asking too much lately?
+                  That's the pattern, not the plan. Want to look at what's been asking too much lately?
                 </p>
-                <p className="text-xs mt-2 italic" style={{ color: "#6D655A" }}>
-                  Heads up: if you cancel or step away to History, this task won't save. Come back and re-enter it if you want to add it.
-                </p>
+                {action === "add" && (
+                  <p className="text-xs mt-2 italic" style={{ color: "#6D655A" }}>
+                    Heads up: if you cancel or step away to History, this task won't save. Come back and re-enter it if you want to add it.
+                  </p>
+                )}
               </div>
             </div>
+            {gentler}
             <div className="flex flex-wrap justify-end gap-2">
               <Button variant="ghost" onClick={onCancel} data-testid="override-cancel">
-                Cancel adding this
+                {action === "add" ? "Cancel adding this" : "Leave it where it was"}
               </Button>
               <Button
                 variant="outline"
                 onClick={() => {
                   onCancel();
-                  toast({
-                    title: "Task not saved.",
-                    description: "Come back to Tasks when you're ready to try again.",
-                  });
+                  if (action === "add") {
+                    toast({
+                      title: "Task not saved.",
+                      description: "Come back to Tasks when you're ready to try again.",
+                    });
+                  }
                   navigate("/history");
                 }}
                 data-testid="override-see-week"
@@ -141,7 +180,11 @@ export function OverrideModal({ open, spoonsOver, onCancel, onConfirmed }: Overr
         ) : step === "choose" || step === "categories" ? (
           <>
             <p className="text-sm font-serif italic" style={{ color: "#3D3A34" }}>
-              This puts you {spoonsOver} {Math.abs(spoonsOver) === 1 ? "spoon" : "spoons"} over. Sometimes you know best. What's going on?
+              This puts you {spoonsOver} {Math.abs(spoonsOver) === 1 ? "spoon" : "spoons"} over today.
+            </p>
+            {gentler && <div className="mt-3">{gentler}</div>}
+            <p className="mt-4 text-sm font-serif italic" style={{ color: "#3D3A34" }}>
+              {gentler ? "Or keep it, sometimes you know best. What's going on?" : "Sometimes you know best. What's going on?"}
             </p>
             <div className="grid gap-2 sm:grid-cols-2 mt-3">
               {CATEGORIES.map((c) => (
@@ -216,7 +259,7 @@ export function OverrideModal({ open, spoonsOver, onCancel, onConfirmed }: Overr
                   disabled={commit.isPending || !category}
                   data-testid="override-confirm"
                 >
-                  {commit.isPending ? "Saving" : "Save and add"}
+                  {commit.isPending ? "Saving" : action === "add" ? "Save and add" : "Save and move"}
                 </Button>
               </div>
             </div>
