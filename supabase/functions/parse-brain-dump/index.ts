@@ -10,7 +10,7 @@ Voice rules for the output text:
 - No exclamation marks.
 - No urgency language.
 - No shame or grading.
-- Never mention bariatric surgery unless the user's own text does.
+- Never mention medical procedures, conditions or other health details unless the user's own text does.
 
 Handle repetition intelligently:
 - If the same task appears N times (verbatim or near-verbatim), DEDUPLICATE it to a single task. Do not emit duplicates.

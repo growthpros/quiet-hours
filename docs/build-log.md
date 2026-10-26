@@ -218,6 +218,20 @@ No change.
 **Checked:**
 Each entry was taken from its pull request's description and from the conversation where the decision was made.
 
+### 2026-10-25: Brain dump AI instructions name no medical procedure
+
+**What and why:**
+The instructions the app sends to the AI when sorting a brain dump named one specific medical procedure, which breaks the house rule against referencing specific medical procedures in the app. The line now tells the AI not to mention medical procedures, conditions or other health details unless the person's own text does.
+
+**Decisions:**
+None (follows the existing voice rule).
+
+**Database:**
+No change. The AI feature runs as a Supabase Edge Function, so the live copy only changes when the function is redeployed to the real project, which needs Caroline's OK.
+
+**Checked:**
+A search of the code finds no other mention. No test added: the change is wording inside the AI's instructions, and a test that searched for the procedure's name would have to name it.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
@@ -231,3 +245,5 @@ Things noticed along the way that aren't scheduled yet:
 - Fonts load from Google's servers, which see visitors' IP addresses. Hosting them with the app would stop that.
 - The Archived filter on the Tasks page compares dates using UTC. It's minor, but it should use the local date like everything else.
 - The two or three early-look testers are still to be chosen.
+- The test database has no Edge Functions (and no Anthropic key), so AI brain dump sorting and task breakdown don't work on previews.
+- Spoon numbers (the daily budget formula, task costs and earn-back values) were invented in the original build. Research is under way, and a spoon model step will follow before subtasks.
