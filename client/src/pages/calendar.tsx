@@ -2,6 +2,7 @@
 // tasks that still need a day. Tasks can be dragged between days; dragging
 // follows the same rules as the Move menu (lib/task-move.ts).
 
+import { spoonsOf, taskSpoons } from "@/lib/spoon-cost";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   DndContext,
@@ -565,7 +566,7 @@ function DayColumn({ day, drag }: { day: CalendarDay; drag: DragState }) {
               </p>
               <p className="text-[11px] text-muted-foreground">
                 {[
-                  t.spoon_estimate ? `${fmt(Number(t.spoon_estimate))} spoon${Number(t.spoon_estimate) === 1 ? "" : "s"}` : null,
+                  spoonsOf(t) ? `${fmt(spoonsOf(t))} spoon${spoonsOf(t) === 1 ? "" : "s"}` : null,
                   "coming up",
                 ]
                   .filter(Boolean)
@@ -582,7 +583,7 @@ function DayColumn({ day, drag }: { day: CalendarDay; drag: DragState }) {
 function ItemRow({ item, drag }: { item: DayItem; drag: DragState }) {
   const { task, status } = item;
   const { template, dragProps, isDragging, movable } = useTaskDrag(task, drag, status);
-  const spoons = task.spoon_estimate != null ? Number(task.spoon_estimate) : null;
+  const spoons = taskSpoons(task);
   return (
     <div
       {...dragProps}

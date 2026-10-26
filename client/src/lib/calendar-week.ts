@@ -9,6 +9,7 @@
 // worked out from each active repeat's pattern. Previews can't be moved
 // or ticked off yet; they become ordinary tasks on the day.
 
+import { spoonsOf } from "@/lib/spoon-cost";
 import { isMissed, isOnToday, weekRange, type WeekStartDay } from "@/lib/task-timeframe";
 import { isoAddDays } from "@/lib/task-move";
 import { expandPattern } from "@/lib/recurring-resolver";
@@ -119,7 +120,7 @@ export function groupDays(
       upcoming,
       openCount: open.length + upcoming.length,
       openSpoons:
-        sum(open, (t) => t.spoon_estimate) + sum(upcoming, (t) => t.spoon_estimate),
+        sum(open, spoonsOf) + sum(upcoming, spoonsOf),
       openHours:
         sum(open, (t) => t.estimated_hours) + sum(upcoming, (t) => t.estimated_hours),
     });

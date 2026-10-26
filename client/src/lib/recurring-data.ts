@@ -4,6 +4,7 @@
 // which is what actually creates rows in the tasks table with
 // recurring_template_id set.
 
+import { DEFAULT_EFFORT } from "@/lib/spoon-cost";
 import { supabase } from "@/lib/supabase";
 import type { Complexity } from "@/lib/tasks-data";
 
@@ -24,9 +25,12 @@ export interface RecurringTemplateRow {
   // Task-shape fields inherited by each generated instance
   title: string;
   notes: string | null;
-  spoon_estimate: number;
+  // The person's own number for each repeat; null means work it out.
+  spoon_estimate: number | null;
   estimated_hours: number;
   complexity: Complexity;
+  social_load: boolean;
+  dread: boolean;
   billable: boolean;
   client_id: number | null;
   project_id: number | null;
@@ -119,9 +123,11 @@ export async function getRecurringTemplate(
 export interface CreateRecurringInput {
   title: string;
   notes?: string | null;
-  spoon_estimate?: number;
+  spoon_estimate?: number | null;
   estimated_hours?: number;
   complexity?: Complexity;
+  social_load?: boolean;
+  dread?: boolean;
   billable?: boolean;
   client_id?: number | null;
   project_id?: number | null;
@@ -157,9 +163,11 @@ export async function createRecurringTemplate(
     user_id,
     title: input.title,
     notes: input.notes ?? null,
-    spoon_estimate: input.spoon_estimate ?? 0.5,
+    spoon_estimate: input.spoon_estimate ?? null,
     estimated_hours: input.estimated_hours ?? 0.5,
-    complexity: input.complexity ?? ("low" as Complexity),
+    complexity: input.complexity ?? DEFAULT_EFFORT,
+    social_load: input.social_load ?? false,
+    dread: input.dread ?? false,
     billable: input.billable ?? false,
     client_id: input.client_id ?? null,
     project_id: input.project_id ?? null,
@@ -228,9 +236,11 @@ export async function propagateTemplateEditsToIncompleteTasks(
   values: {
     title: string;
     notes: string | null;
-    spoon_estimate: number;
+    spoon_estimate: number | null;
     estimated_hours: number;
     complexity: Complexity;
+    social_load: boolean;
+    dread: boolean;
     billable: boolean;
   },
 ): Promise<number> {
@@ -242,6 +252,8 @@ export async function propagateTemplateEditsToIncompleteTasks(
       spoon_estimate: values.spoon_estimate,
       estimated_hours: values.estimated_hours,
       complexity: values.complexity,
+      social_load: values.social_load,
+      dread: values.dread,
       billable: values.billable,
       updated_at: Date.now(),
     })

@@ -2,7 +2,8 @@
 //
 // Takes a single task (title + optional notes) and asks Claude to suggest
 // 3-6 smaller sub-tasks that together accomplish the parent. Each sub-task
-// gets the same fields as parse-brain-dump output.
+// gets the same fields as parse-brain-dump output. The app works out spoons
+// from time and effort, so the model isn't asked for them.
 
 import { corsHeaders } from "../_shared/cors.ts";
 import { callClaude, stripJsonFences } from "../_shared/claude.ts";
@@ -16,7 +17,7 @@ Voice rules:
 - No shame or grading.
 - Notice, don't grade. Invitations, not commands.
 
-For each sub-task, populate: title (short concrete action), notes (optional), spoon_estimate (1-10, energy cost including mental and emotional load), estimated_hours (15-min increments), complexity ("low"/"medium"/"high"), billable (boolean, inherit from parent if a client signal is present), break_down_hint (true only if the sub-task is still large enough to want another split; usually false).
+For each sub-task, populate: title (short concrete action), notes (optional), estimated_hours (15-min increments, your best guess at real time), complexity (the effort level: "low" is routine and familiar, "medium" is focused thinking or light physical work, "high" is hard thinking, new or high-stakes, or physically hard), with_people (true if it happens with other people, on camera, or somewhere noisy or busy), billable (boolean, inherit from parent if a client signal is present), break_down_hint (true only if the sub-task is still large enough to want another split; usually false). Do not estimate spoons: the app works them out from time and effort.
 
 Return ONLY valid JSON:
 {
@@ -24,9 +25,9 @@ Return ONLY valid JSON:
     {
       "title": "string",
       "notes": "string (optional)",
-      "spoon_estimate": number,
       "estimated_hours": number,
       "complexity": "low" | "medium" | "high",
+      "with_people": boolean,
       "billable": boolean,
       "break_down_hint": boolean
     }

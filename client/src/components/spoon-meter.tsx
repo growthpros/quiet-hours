@@ -4,6 +4,7 @@
 // Also renders a horizontal cluster of "quick earn" chips (featured actions),
 // and a "more" button that opens the full earn-back panel.
 
+import { spoonsOf } from "@/lib/spoon-cost";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { listTasks } from "@/lib/tasks-data";
@@ -149,12 +150,7 @@ export function SpoonMeter() {
             t.completed_at != null &&
             (t.completed_at as number) >= startOfToday,
         )
-        .reduce(
-          (acc, t) =>
-            acc +
-            (t.spoon_estimate != null ? Number(t.spoon_estimate) : 0),
-          0,
-        )
+        .reduce((acc, t) => acc + spoonsOf(t), 0)
     : 0;
 
   const spent = (ledger ? Number(ledger.spent) : 0) + spentFromTasksToday;

@@ -34,6 +34,9 @@ export interface TaskRow {
   estimated_hours: number | null;
   actual_hours: number | null;
   complexity: Complexity | null;
+  // Cost inputs (migration 015): with people/noise, and dread.
+  social_load: boolean;
+  dread: boolean;
   due_date: string | null; // ISO date, YYYY-MM-DD
   due_bucket: DueBucket | null;
   billable: boolean;
@@ -55,14 +58,43 @@ export interface TaskRow {
 
 // Shape of an AI-parsed item as returned by the parse-brain-dump edge function.
 // Stored inside brain_dumps.parsed_items as a JSONB array.
+//
+// The AI suggests the inputs (time, effort, with people), never the spoons:
+// the app works spoons out the same way for every task. Older parsed items
+// may still carry an AI `spoon_estimate`; it's ignored on purpose.
 export interface ParsedTaskItem {
   title: string;
   notes?: string;
+  /** Older AI output only. Not used. */
   spoon_estimate?: number;
   estimated_hours?: number;
   complexity?: Complexity;
+  /** AI's guess: with people, on camera, or somewhere noisy. */
+  with_people?: boolean;
+  /** Set when the person edits the item in review. */
+  social_load?: boolean;
+  dread?: boolean;
+  /** A spoon number the person typed in review. */
+  spoon_override?: number;
   billable?: boolean;
   break_down_hint?: boolean; // AI suggests this is big enough to split
+}
+
+/** The cost fields to save for a parsed item (see ParsedTaskItem). */
+export function parsedItemCostFields(it: ParsedTaskItem): {
+  spoonEstimate: number | null;
+  estimatedHours: number | null;
+  complexity: Complexity | null;
+  socialLoad: boolean;
+  dread: boolean;
+} {
+  return {
+    spoonEstimate: it.spoon_override ?? null,
+    estimatedHours: it.estimated_hours ?? null,
+    complexity: it.complexity ?? null,
+    socialLoad: it.social_load ?? it.with_people ?? false,
+    dread: it.dread ?? false,
+  };
 }
 
 export interface BrainDumpRow {
@@ -100,6 +132,8 @@ export interface CreateTaskInput {
   spoonEstimate?: number | null;
   estimatedHours?: number | null;
   complexity?: Complexity | null;
+  socialLoad?: boolean;
+  dread?: boolean;
   dueDate?: string | null; // YYYY-MM-DD
   dueBucket?: DueBucket | null;
   billable?: boolean;
@@ -129,6 +163,8 @@ export async function createTask(input: CreateTaskInput): Promise<TaskRow> {
       spoon_estimate: input.spoonEstimate ?? null,
       estimated_hours: input.estimatedHours ?? null,
       complexity: input.complexity ?? null,
+      social_load: input.socialLoad ?? false,
+      dread: input.dread ?? false,
       due_date: input.dueDate ?? null,
       due_bucket: newTaskBucket(input),
       billable: input.billable ?? false,
@@ -151,6 +187,8 @@ export interface UpdateTaskPatch {
   estimatedHours?: number | null;
   actualHours?: number | null;
   complexity?: Complexity | null;
+  socialLoad?: boolean;
+  dread?: boolean;
   dueDate?: string | null;
   dueBucket?: DueBucket | null;
   billable?: boolean;
@@ -178,6 +216,8 @@ export async function updateTask(
     dbPatch.estimated_hours = patch.estimatedHours;
   if (patch.actualHours !== undefined) dbPatch.actual_hours = patch.actualHours;
   if (patch.complexity !== undefined) dbPatch.complexity = patch.complexity;
+  if (patch.socialLoad !== undefined) dbPatch.social_load = patch.socialLoad;
+  if (patch.dread !== undefined) dbPatch.dread = patch.dread;
   if (patch.dueDate !== undefined) dbPatch.due_date = patch.dueDate;
   if (patch.dueBucket !== undefined) dbPatch.due_bucket = patch.dueBucket;
   if (patch.billable !== undefined) dbPatch.billable = patch.billable;

@@ -262,6 +262,8 @@ async function insertInstance(
     spoon_estimate: t.spoon_estimate,
     estimated_hours: t.estimated_hours,
     complexity: t.complexity,
+    social_load: t.social_load ?? false,
+    dread: t.dread ?? false,
     billable: t.billable,
     client_id: t.client_id,
     project_id: t.project_id,
