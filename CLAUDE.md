@@ -6,7 +6,7 @@ Quiet Hours is a neurodivergent-designed planner and burnout check-in app, built
 
 1. Never touch the production database without Caroline's explicit OK in the current conversation.
 2. One change per branch, one pull request per change. Merging to `main` deploys to the live app automatically.
-3. A change is done only when `npm run verify` passes, a test proves it, and it has been checked on a preview deployment.
+3. A change is done only when `npm run verify` passes, a test proves it, it has been checked on a preview deployment, and `docs/build-log.md` has an entry for it.
 4. Explain the why, in plain language. Caroline is learning, not coding.
 
 ## How the app is built
@@ -40,10 +40,11 @@ The test project holds no real data. Use it freely. Production holds real users'
 - A bug fix comes with a test that fails before the fix and passes after it.
 - The change has been checked on the branch's preview deployment.
 - Never call something fixed because a string appears in the built bundle. That proves the code shipped, not that it works.
+- The pull request adds an entry to `docs/build-log.md` (what and why, decisions, database, how it was checked), and any decision Caroline made goes in its Decisions table.
 
 **Database changes**
 
-- Every schema change is a new numbered file in `supabase/migrations/` (next is `014_...`). Never edit an applied migration.
+- Every schema change is a new numbered file in `supabase/migrations/` (next is `015_...`). Never edit an applied migration.
 - Apply it to the test project first and check it there.
 - Apply to production only after the pull request is approved, and only with Caroline's OK. If the app code depends on the change, apply it to production before merging.
 - Every new table that holds user data needs:
@@ -94,5 +95,6 @@ These apply to every word in the app and in anything written for Caroline.
 
 ## Where else things live
 
+- Build history and every decision so far: `docs/build-log.md`. Read it before starting work.
 - Product spec (v3), session specs, testing checklists and mockups: Caroline's Google Drive, folder "Quiet Hours".
 - Health report from the October 2026 audit: Caroline's Claude doc "Quiet Hours Health Report v1".
