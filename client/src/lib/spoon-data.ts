@@ -181,6 +181,20 @@ async function patchLedger(patch: Partial<Pick<SpoonLedgerRow, "allotted" | "com
   return data as SpoonLedgerRow;
 }
 
+// The most recent days' check-in budgets, newest first, for "your usual"
+// (see spoon-budget.ts). Days without a check-in have allotted 0 and are
+// left out.
+export async function listRecentAllotments(limit: number): Promise<number[]> {
+  const { data, error } = await supabase
+    .from("spoon_ledger")
+    .select("allotted, log_date")
+    .gt("allotted", 0)
+    .order("log_date", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map((r: { allotted: number }) => Number(r.allotted));
+}
+
 // Called from the burnout check-in flow. If today's ledger has no allotment
 // yet, issue one now based on this check-in. If it already has one, leave it.
 export async function maybeIssueSpoonsFromCheckin(checkin: BurnoutCheckinRow): Promise<SpoonLedgerRow> {

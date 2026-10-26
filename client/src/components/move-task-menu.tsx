@@ -28,6 +28,7 @@ import type { RecurringTemplateRow } from "@/lib/recurring-data";
 import {
   MOVE_CHOICES,
   MOVE_LABEL,
+  isoAddDays,
   describeWhen,
   repeatMoveWindow,
   repeatQuickChoices,
@@ -61,7 +62,12 @@ export function MoveTaskMenu({
   const minDate = isRepeat ? window?.earliest : today;
   const maxDate = isRepeat ? window?.latest : undefined;
 
-  const { moveTo, isMoving } = useTaskMover();
+  const { moveTo, isMoving, overrideDialog } = useTaskMover();
+  const tomorrow = isoAddDays(today, 1);
+  // A repeat can only go to tomorrow if tomorrow is inside its window.
+  const moveOpts = {
+    canMoveTomorrow: !isRepeat || (!!window && tomorrow >= window.earliest && tomorrow <= window.latest),
+  };
 
   // A repeat with nowhere to go (for example a daily repeat) gets no menu.
   if (isRepeat && (!template || !window)) return null;
@@ -71,7 +77,7 @@ export function MoveTaskMenu({
       isRepeat && (choice === "today" || choice === "tomorrow")
         ? whenForRepeatChoice(choice, today)
         : whenForChoice(choice, today);
-    moveTo(task, to);
+    moveTo(task, to, moveOpts);
   };
 
   const pickedIsValid =
@@ -156,7 +162,7 @@ export function MoveTaskMenu({
             <Button
               disabled={!pickedIsValid || isMoving}
               onClick={() => {
-                moveTo(task, whenForDate(pickedDate));
+                moveTo(task, whenForDate(pickedDate), moveOpts);
                 setPicking(false);
               }}
               data-testid={`button-move-date-confirm-${task.id}`}
@@ -166,6 +172,7 @@ export function MoveTaskMenu({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {overrideDialog}
     </>
   );
 }

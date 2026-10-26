@@ -38,7 +38,6 @@ import {
   createTask,
   updateTask,
   deleteTask,
-  committedSpoonsFromTasks,
   breakDownTask,
   linkTaskToRecurringTemplate,
   archiveTask,
@@ -46,7 +45,8 @@ import {
   type TaskRow,
   type DueBucket,
 } from "@/lib/tasks-data";
-import { getOrCreateTodayLedger } from "@/lib/spoon-data";
+import { getOrCreateTodayLedger, listRecentAllotments } from "@/lib/spoon-data";
+import { USUAL_WINDOW, spoonsOverIfAdded, usualBudget } from "@/lib/spoon-budget";
 import { OverrideModal } from "@/components/override-modal";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -1052,19 +1052,23 @@ function NewTaskDialog() {
         return;
       }
 
-      // Check today's budget: allotted - (committed_tasks + spent).
-      const ledger = await getOrCreateTodayLedger();
-      const committedTasks = await committedSpoonsFromTasks();
-      const projected =
-        committedTasks + Number(ledger.spent) + spoonNum -
-        Number(ledger.earned_back);
-      const budget = Number(ledger.allotted);
-
-      if (budget > 0 && projected > budget) {
-        setPendingOverride({
-          spoonsOver: projected - budget,
-          conv,
-        });
+      // Check today's budget (see lib/spoon-budget.ts): spent so far,
+      // including tasks finished today, plus today's plan plus this task,
+      // against the check-in budget, or your usual before the check-in.
+      const [ledger, tasksNow, recent] = await Promise.all([
+        getOrCreateTodayLedger(),
+        listTasks(),
+        listRecentAllotments(USUAL_WINDOW),
+      ]);
+      const over = spoonsOverIfAdded(
+        tasksNow,
+        ledger,
+        usualBudget(recent),
+        localIsoDate(),
+        spoonNum,
+      );
+      if (over > 0) {
+        setPendingOverride({ spoonsOver: over, conv });
         return;
       }
 
@@ -1201,6 +1205,24 @@ function NewTaskDialog() {
             setPendingOverride(null);
             void persist(conv);
           }
+        }}
+        onMoveTomorrow={() => {
+          if (pendingOverride) {
+            const conv = pendingOverride.conv;
+            setPendingOverride(null);
+            void persist({
+              ...conv,
+              dueDate: localIsoDate(addLocalDays(new Date(), 1)),
+              dueBucket: null,
+            });
+          }
+        }}
+        onMakeSmaller={() => {
+          setPendingOverride(null);
+          toast({
+            title: "What's the smallest piece that fits today?",
+            description: "Change the title and spoons to just that piece, then add it.",
+          });
         }}
       />
     </>
