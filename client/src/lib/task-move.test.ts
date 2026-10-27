@@ -18,7 +18,7 @@ const TODAY = "2026-10-21";
 function template(o: Partial<RecurringTemplateRow>): RecurringTemplateRow {
   return {
     id: 1, user_id: "u", title: "t", notes: null, spoon_estimate: 1, estimated_hours: 0.5,
-    complexity: "low", billable: false, client_id: null, project_id: null, tag_ids: [],
+    complexity: "low", social_load: false, dread: false, billable: false, client_id: null, project_id: null, tag_ids: [],
     pattern_type: "daily", interval_n: 1, days_of_week: [], monthly_kind: null,
     day_of_month: null, nth_weekday: null, nth_weekday_day: null, start_date: "2026-10-01",
     end_date: null, end_after_n: null, occurrences_generated: 0, last_generated_for: null,

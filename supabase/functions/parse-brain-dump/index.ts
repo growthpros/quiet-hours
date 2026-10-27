@@ -18,16 +18,17 @@ Handle repetition intelligently:
 For each proposed task:
 - title: short, clear, actionable. Keep user's intent.
 - notes: optional context.
-- spoon_estimate: 1-10 energy cost.
-- estimated_hours: hours in 15-min increments (0.25 step).
-- complexity: low, medium, or high.
+- estimated_hours: hours in 15-min increments (0.25 step). Your best guess at real time, including getting started.
+- complexity: the effort level. "low" is routine and familiar (sorting email, folding laundry). "medium" is focused thinking or light physical work (writing, cooking, a grocery run). "high" is hard thinking, new or high-stakes, or physically hard (complex analysis, presenting, deep cleaning).
+- with_people: true if it happens with other people, on camera, or somewhere noisy or busy (meetings, calls, a busy store). Otherwise false.
+- Do not estimate spoons. The app works them out from time and effort.
 - billable: true if client work or project work someone would bill for.
 - break_down_hint: true if complexity is high OR estimated_hours > 4.
 
 Do NOT infer: recurring, tags, client name, project name, due date, due bucket.
 
 Return ONLY valid JSON:
-{"items":[{"title":"string","notes":"string (optional)","spoon_estimate":number,"estimated_hours":number,"complexity":"low"|"medium"|"high","billable":boolean,"break_down_hint":boolean}]}
+{"items":[{"title":"string","notes":"string (optional)","estimated_hours":number,"complexity":"low"|"medium"|"high","with_people":boolean,"billable":boolean,"break_down_hint":boolean}]}
 
 If no actionable items, return {"items": []}.`;
 

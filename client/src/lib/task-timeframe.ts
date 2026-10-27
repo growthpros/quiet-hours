@@ -5,6 +5,7 @@
 // day (see local-date.ts). Weeks start on the person's chosen day
 // (Sunday by default; see user_profiles.week_starts_on).
 
+import { spoonsOf, type SpoonTask } from "@/lib/spoon-cost";
 import { addLocalDays, localIsoDate } from "@/lib/local-date";
 import type { TaskRow } from "@/lib/tasks-data";
 
@@ -118,13 +119,13 @@ export function matchesTimeframe(
   return true;
 }
 
-// Spoons committed today: the spoon estimates of today's unfinished tasks.
-// Tasks for later days don't count against today's budget.
+// Spoons committed today: the spoons of today's unfinished tasks (typed,
+// or worked out from time and effort). Later days don't count.
 export function committedSpoonsToday(
-  tasks: (TaskLike & Pick<TaskRow, "spoon_estimate">)[],
+  tasks: (TaskLike & SpoonTask)[],
   todayIso: string,
 ): number {
   return tasks
     .filter((t) => isOnToday(t, todayIso))
-    .reduce((sum, t) => sum + (t.spoon_estimate != null ? Number(t.spoon_estimate) : 0), 0);
+    .reduce((sum, t) => sum + spoonsOf(t), 0);
 }

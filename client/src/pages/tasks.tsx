@@ -41,12 +41,14 @@ import {
   breakDownTask,
   linkTaskToRecurringTemplate,
   archiveTask,
+  parsedItemCostFields,
   DUE_BUCKET_LABEL,
   type TaskRow,
   type DueBucket,
 } from "@/lib/tasks-data";
 import { getOrCreateTodayLedger, listRecentAllotments } from "@/lib/spoon-data";
 import { USUAL_WINDOW, spoonsOverIfAdded, usualBudget } from "@/lib/spoon-budget";
+import { DEFAULT_EFFORT, spoonsOf, spoonsOfInput, taskSpoons } from "@/lib/spoon-cost";
 import { OverrideModal } from "@/components/override-modal";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -54,6 +56,7 @@ import {
   defaultTaskFieldsValue,
   fieldsToTaskInput,
   type TaskFieldsValue,
+  type TaskInput,
 } from "@/components/task-fields-form";
 import { ChevronLeft, Repeat, RefreshCw } from "lucide-react";
 import {
@@ -113,15 +116,13 @@ const TIMEFRAME_LABEL: Record<TimeframeFilter, string> = {
 
 function TaskChips({ task }: { task: TaskRow }) {
   const chips: string[] = [];
-  if (task.spoon_estimate != null) {
-    const n = Number(task.spoon_estimate);
-    chips.push(`${n} spoon${n === 1 ? "" : "s"}`);
-  }
+  const n = taskSpoons(task);
+  if (n != null) chips.push(`${n} spoon${n === 1 ? "" : "s"}`);
   if (task.estimated_hours != null) {
     const h = Number(task.estimated_hours);
     chips.push(`${h}h`);
   }
-  if (task.complexity) chips.push(task.complexity);
+  if (task.complexity) chips.push(`${task.complexity} effort`);
   if (task.billable) chips.push("billable");
   if (task.due_bucket && task.due_bucket !== "today") {
     chips.push(DUE_BUCKET_LABEL[task.due_bucket]);
@@ -425,6 +426,8 @@ function TaskCard({
         spoonEstimate: conv.spoonEstimate,
         estimatedHours: conv.estimatedHours,
         complexity: conv.complexity,
+        socialLoad: conv.socialLoad,
+        dread: conv.dread,
         dueDate: conv.dueDate,
         dueBucket: conv.dueBucket,
         billable: conv.billable,
@@ -481,9 +484,7 @@ function TaskCard({
         await createTask({
           title: it.title,
           notes: it.notes ?? null,
-          spoonEstimate: it.spoon_estimate ?? null,
-          estimatedHours: it.estimated_hours ?? null,
-          complexity: it.complexity ?? null,
+          ...parsedItemCostFields(it),
           dueBucket: task.due_bucket ?? "today",
           dueDate: task.due_date,
           billable: it.billable ?? task.billable,
@@ -783,9 +784,11 @@ function MakeRecurringDialog({
       const template = await createRecurringTemplate({
         title: task.title,
         notes: task.notes,
-        spoon_estimate: task.spoon_estimate ?? 3,
+        spoon_estimate: task.spoon_estimate,
         estimated_hours: task.estimated_hours ?? 0.5,
-        complexity: task.complexity ?? "low",
+        complexity: task.complexity ?? DEFAULT_EFFORT,
+        social_load: task.social_load,
+        dread: task.dread,
         billable: task.billable,
         pattern_type: pattern.pattern_type,
         interval_n: pattern.interval_n,
@@ -859,6 +862,8 @@ function taskToFields(task: TaskRow): TaskFieldsValue {
     estimatedHours:
       task.estimated_hours != null ? String(task.estimated_hours) : "",
     complexity: task.complexity ?? "",
+    socialLoad: task.social_load ?? false,
+    dread: task.dread ?? false,
     timeline: task.due_date
       ? "specific_date"
       : (task.due_bucket ?? "today"),
@@ -919,16 +924,7 @@ function NewTaskDialog() {
   // Narrower conv type: at set-time we've already thrown when the union
   // was in the {error} branch, so the stored value is always the success
   // branch. Compiler can't remember that across the state hop.
-  type ConvSuccess = {
-    title: string;
-    notes: string | null;
-    spoonEstimate: number | null;
-    estimatedHours: number | null;
-    complexity: import("@/lib/tasks-data").Complexity | null;
-    dueDate: string | null;
-    dueBucket: import("@/lib/tasks-data").DueBucket | null;
-    billable: boolean;
-  };
+  type ConvSuccess = TaskInput;
   const [pendingOverride, setPendingOverride] = useState<null | {
     spoonsOver: number;
     conv: ConvSuccess;
@@ -982,16 +978,7 @@ function NewTaskDialog() {
     setStep("task");
   };
 
-  const persist = async (conv: {
-    title: string;
-    notes: string | null;
-    spoonEstimate: number | null;
-    estimatedHours: number | null;
-    complexity: import("@/lib/tasks-data").Complexity | null;
-    dueDate: string | null;
-    dueBucket: import("@/lib/tasks-data").DueBucket | null;
-    billable: boolean;
-  }) => {
+  const persist = async (conv: TaskInput) => {
     await createTask(conv);
     qc.invalidateQueries({ queryKey: ["tasks"] });
     qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
@@ -1015,9 +1002,11 @@ function NewTaskDialog() {
         await createRecurringTemplate({
           title: conv.title,
           notes: conv.notes,
-          spoon_estimate: conv.spoonEstimate ?? 3,
+          spoon_estimate: conv.spoonEstimate,
           estimated_hours: conv.estimatedHours ?? 0.5,
-          complexity: conv.complexity ?? "low",
+          complexity: conv.complexity ?? DEFAULT_EFFORT,
+          social_load: conv.socialLoad,
+          dread: conv.dread,
           billable: conv.billable,
           pattern_type: patternDraft.pattern_type,
           interval_n: patternDraft.interval_n,
@@ -1045,7 +1034,7 @@ function NewTaskDialog() {
       const landsOnToday =
         conv.dueBucket === "today" ||
         (conv.dueDate === localIsoDate());
-      const spoonNum = conv.spoonEstimate ?? 0;
+      const spoonNum = spoonsOfInput(conv);
 
       if (!landsOnToday || spoonNum === 0) {
         await persist(conv);
@@ -1619,7 +1608,7 @@ function spoonText(n: number): string {
 // shows the schedule and how many times, so a daily repeat appears once.
 function upcomingLine(u: UpcomingRepeat, singleDay: boolean): string {
   const t = u.template;
-  const spoons = t.spoon_estimate ? Number(t.spoon_estimate) : 0;
+  const spoons = spoonsOf(t);
   if (singleDay) return [t.title, spoons ? spoonText(spoons) : null].filter(Boolean).join(", ");
   const pattern = describePattern(t);
   return [

@@ -9,6 +9,7 @@
 // If it would go over, the over-budget prompt opens instead, so callers
 // must render the `overrideDialog` this hook returns.
 
+import { spoonsOf } from "@/lib/spoon-cost";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ToastAction } from "@/components/ui/toast";
@@ -102,7 +103,7 @@ export function useTaskMover() {
   const moveTo = (task: TaskRow, to: When, opts: MoveOptions = {}) => {
     const today = localIsoDate();
     const landsOnToday = to.dueDate === today || to.dueBucket === "today";
-    const spoons = task.spoon_estimate != null ? Number(task.spoon_estimate) : 0;
+    const spoons = spoonsOf(task);
     // Only a task arriving on Today adds to Today's load.
     if (landsOnToday && task.completed_at == null && !isOnToday(task, today) && spoons > 0) {
       const tasks = qc.getQueryData<TaskRow[]>(["tasks"]) ?? [];

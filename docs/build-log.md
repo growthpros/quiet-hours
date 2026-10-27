@@ -48,6 +48,9 @@ Checked: tests, test database run, preview, live check.
 | 2026-10-25 | Spoon totals recalculate when tasks move in or out of Today, and moving or dragging a task onto Today checks the budget, the same as adding one. | Caroline |
 | 2026-10-25 | Future days are compared with "your usual" (the middle of the last 14 check-in budgets); each day's real budget still comes from that morning's check-in. | Caroline |
 | 2026-10-25 | The spoon numbers (daily budget formula, task costs, earn-back values) get researched before they're changed. | Caroline |
+| 2026-10-26 | Task spoons are worked out from time × effort (from the spoon research), and anyone can type their own number instead. | Caroline |
+| 2026-10-26 | When no effort is picked, a task counts as Medium. If the math comes out higher than expected, that's a nudge to pick the effort that fits. | Caroline |
+| 2026-10-26 | The spoon model changes go in as four small changes, in order: task spoons, daily budget, earn-back, then wording ("Check-in", "Your Wave", and the renamed phases). | Caroline |
 
 ## History
 
@@ -263,6 +266,36 @@ No change.
 **Checked:**
 127 tests, including the new budget rules and new-task timeframes. In a real browser against the test database: amber on an over day; dragging onto a full Today opened the prompt, "Move to tomorrow instead" moved it to tomorrow, and keeping it logged the override and turned Today amber; adding a task counted the spoons finished earlier; "Move to tomorrow instead" when adding saved a date with no timeframe; the pause appeared on the 3rd override.
 
+### 2026-10-26: Task spoons from time × effort (spoon model, change 1)
+
+**What and why:**
+A task only counted toward the day if someone typed a spoon number. A task with a time but no spoons, like a one-hour "Plan my week," counted as zero, so the meter and the over-budget prompt never noticed it. The spoon numbers themselves were also guesses from the original build.
+
+What changed:
+
+- New `lib/spoon-cost.ts` works out spoons the way the spoon research recommends:
+  - 1, 2 or 3 spoons an hour for Low, Medium or High effort
+  - hours past 2 count 1.25 times
+  - "with people, on camera, or somewhere noisy or busy" counts 1.5 times
+  - "something I'm dreading" adds 1
+  - rounded up to the half spoon, never less than half a spoon
+- A number the person types always wins. Empty now means "work it out."
+- When no effort is picked, it counts as Medium, and the form says so.
+- The task form and the repeat editor share a new "How much will it take?" box: Time, Effort (with examples), the two yes/no questions, and Spoons. The Spoons box shows the worked-out number, the math underneath, and a "Use the math" link when someone has typed their own.
+- Every total uses the same rule: the spoon meter, the over-budget prompt (adding, moving, dragging), Calendar days and amber, upcoming repeats, and the Tasks page.
+- "Complexity" is now called "Effort." Task chips read "high effort."
+- The highest spoon number is now 60 instead of 10 or 20, because a long, hard day works out to more than the old limit (an 8-hour, high-effort task is 28.5).
+- The AI brain dump and task breakdown now suggest time, effort and "with people," not spoons, so every task's spoons come from the same math. Older brain dumps that carry an AI spoon guess are ignored.
+
+**Decisions:**
+See the Decisions table (time × effort with your own number winning, Medium when no effort is picked, the four-change order).
+
+**Database:**
+Migration 015 adds `social_load` and `dread` to tasks and repeat templates, lets a repeat's spoon number be empty, and raises the limit to 60. Applied to the test database. Typed numbers already saved are unchanged, so existing repeats keep their numbers until someone clears the Spoons box. The real database needs it before merging, with Caroline's OK. The two AI functions need redeploying to the real project after merging, also with her OK (their new answers leave out the spoon guess the current live app still reads).
+
+**Checked:**
+139 tests, including the research table and examples, typed numbers winning, and the meter, budget and Calendar counting tasks that only have a time. These budget tests fail on the old code. In a real browser against the test database: the meter counted a one-hour task with no spoons as 2; a one-hour, medium, with-people, dreaded call showed "4 spoons" with the math, a typed 3 showed "The math says 4 spoons," "Use the math" cleared it, and the saved task kept an empty spoon number with both boxes ticked; the next task went half a spoon over and opened the prompt; the repeat editor showed the math; the form fit a phone screen.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
@@ -277,6 +310,7 @@ Things noticed along the way that aren't scheduled yet:
 - The Archived filter on the Tasks page compares dates using UTC. It's minor, but it should use the local date like everything else.
 - The two or three early-look testers are still to be chosen.
 - The test database has no Edge Functions (and no Anthropic key), so AI brain dump sorting and task breakdown don't work on previews.
-- Spoon numbers (the daily budget formula, task costs and earn-back values) were invented in the original build. The research is done (Caroline's Claude doc "Quiet Hours Spoon Research v1"), and a spoon model step follows before subtasks.
+- Spoon numbers: task costs now follow the research (change 1). The daily budget formula and earn-back values are next (changes 2 and 3), then the wording (change 4).
+- The Repeats page can show "Nothing repeats yet" for a repeat created outside the app until the page is reloaded. Seen only in testing; repeats made in the app show right away.
 - Not built yet from the spoon rules in spec v3: the 2nd-override heads-up, "Talk it through" and the link to the last crash in the pause, phases changing Foundation, the hours meter, and the two check-in safety rules. "Make it smaller" for moved tasks waits for subtasks.
 - Task breakdown still creates its steps with both a date and a timeframe; subtasks (Phase 2) replace it.

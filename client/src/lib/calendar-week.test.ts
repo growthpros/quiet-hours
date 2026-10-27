@@ -9,7 +9,7 @@ let nextId = 1;
 function task(o: Partial<TaskRow>): TaskRow {
   return {
     id: nextId++, user_id: "u", title: "t", notes: null, spoon_estimate: null,
-    estimated_hours: null, actual_hours: null, complexity: null, due_date: null,
+    estimated_hours: null, actual_hours: null, complexity: null, social_load: false, dread: false, due_date: null,
     due_bucket: null, billable: false, client_id: null, project_id: null,
     completion_reason: null, rolled_from_date: null, completed_at: null,
     recurring_template_id: null, archived_at: null, created_at: 0, updated_at: 0, ...o,
@@ -56,6 +56,18 @@ describe("groupWeek", () => {
     expect(d.openHours).toBe(1);
   });
 
+  it("a day's spoons include tasks with only a time (worked out from time × effort)", () => {
+    const sat = groupWeek(
+      [
+        task({ due_date: "2026-10-24", estimated_hours: 1 }), // medium assumed: 2
+        task({ due_date: "2026-10-24", estimated_hours: 1, complexity: "low", social_load: true }), // 1.5
+        task({ due_date: "2026-10-24", spoon_estimate: 0.5, estimated_hours: 3, complexity: "high" }), // typed wins
+      ],
+      TODAY, 0, 0,
+    ).days.find((d) => d.iso === "2026-10-24")!;
+    expect(sat.openSpoons).toBe(4);
+  });
+
   it("past days show what was missed there; carried-over tasks don't repeat on their old day", () => {
     expect(titlesOn(w, "2026-10-19")).toEqual(["Missed Monday:missed"]);
     expect(titlesOn(w, "2026-10-20")).toEqual(["Repeat Tuesday:missed"]);
@@ -91,7 +103,7 @@ describe("groupWeek", () => {
 function template(o: Partial<RecurringTemplateRow>): RecurringTemplateRow {
   return {
     id: 50, user_id: "u", title: "Repeat", notes: null, spoon_estimate: 1,
-    estimated_hours: 0.5, complexity: "low" as RecurringTemplateRow["complexity"],
+    estimated_hours: 0.5, complexity: "low" as RecurringTemplateRow["complexity"], social_load: false, dread: false,
     billable: false, client_id: null, project_id: null, tag_ids: [],
     pattern_type: "weekly", interval_n: 1, days_of_week: [2, 4],
     monthly_kind: null, day_of_month: null, nth_weekday: null, nth_weekday_day: null,

@@ -11,7 +11,7 @@ import {
 // Tests run in US Eastern time (see vitest.config.ts).
 const TODAY = "2026-10-21";
 const at = (iso: string, hour: number) => new Date(`${iso}T${String(hour).padStart(2, "0")}:00:00`).getTime();
-const t = (o: Partial<{ spoon_estimate: number | null; completed_at: number | null; due_date: string | null; due_bucket: "today" | "this_week" | null; archived_at: string | null }>) => ({
+const t = (o: Partial<{ spoon_estimate: number | null; estimated_hours: number | null; complexity: "low" | "medium" | "high" | null; completed_at: number | null; due_date: string | null; due_bucket: "today" | "this_week" | null; archived_at: string | null }>) => ({
   spoon_estimate: null, completed_at: null, due_date: null, due_bucket: null, archived_at: null, recurring_template_id: null, ...o,
 });
 
@@ -65,6 +65,18 @@ describe("adding to today", () => {
   it("checks against your usual before the check-in (it used to skip the check)", () => {
     const tasks = [t({ spoon_estimate: 9, due_bucket: "today" })];
     expect(spoonsOverIfAdded(tasks, { allotted: 0, spent: 0, earned_back: 0 }, 10, TODAY, 3)).toBe(2);
+  });
+  it("counts a task with a time but no typed spoons (it used to count as 0)", () => {
+    // "Plan my week", 1 hour, no effort picked: 2 spoons.
+    const tasks = [t({ estimated_hours: 1, due_bucket: "today" }), t({ spoon_estimate: 7, due_bucket: "today" })];
+    expect(spoonsOverIfAdded(tasks, ledger, 12, TODAY, 2)).toBe(1);
+  });
+  it("uses a typed number over the math", () => {
+    const tasks = [t({ spoon_estimate: 1, estimated_hours: 4, complexity: "high", due_bucket: "today" })];
+    expect(spoonsOverIfAdded(tasks, ledger, 12, TODAY, 9)).toBe(0);
+  });
+  it("counts worked-out spoons for tasks finished today", () => {
+    expect(spentToday([t({ estimated_hours: 0.5, complexity: "high", completed_at: at(TODAY, 10) })], 0, TODAY)).toBe(1.5);
   });
   it("is 0 when it fits, or when the task has no spoons", () => {
     expect(spoonsOverIfAdded([], ledger, 12, TODAY, 4)).toBe(0);

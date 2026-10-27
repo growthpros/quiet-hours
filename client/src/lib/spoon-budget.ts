@@ -6,9 +6,10 @@
 // point, until there are any). A future day's real budget is set by that
 // day's check-in, when the app knows more.
 //
-// The numbers themselves (the check-in formula and task costs) are being
-// reviewed against research; this file only decides how they're compared.
+// Task costs come from spoon-cost.ts (typed, or time × effort). This file
+// only decides how they're compared with the day's budget.
 
+import { spoonsOf, type SpoonTask as CostTask } from "@/lib/spoon-cost";
 import { committedSpoonsToday } from "@/lib/task-timeframe";
 import { localIsoDate } from "@/lib/local-date";
 import type { TaskRow } from "@/lib/tasks-data";
@@ -49,10 +50,8 @@ export function todayBudget(
     : { budget: usual + earned, fromCheckin: false };
 }
 
-type SpoonTask = Pick<
-  TaskRow,
-  "spoon_estimate" | "completed_at" | "due_date" | "due_bucket" | "archived_at" | "recurring_template_id"
->;
+type SpoonTask = CostTask &
+  Pick<TaskRow, "completed_at" | "due_date" | "due_bucket" | "archived_at" | "recurring_template_id">;
 
 /** Spoons already used today: logged spending plus tasks finished today. */
 export function spentToday(tasks: SpoonTask[], ledgerSpent: number, todayIso: string): number {
@@ -62,7 +61,7 @@ export function spentToday(tasks: SpoonTask[], ledgerSpent: number, todayIso: st
         t.completed_at != null &&
         localIsoDate(new Date(Number(t.completed_at))) === todayIso,
     )
-    .reduce((sum, t) => sum + (t.spoon_estimate != null ? Number(t.spoon_estimate) : 0), 0);
+    .reduce((sum, t) => sum + spoonsOf(t), 0);
   return Number(ledgerSpent || 0) + finished;
 }
 

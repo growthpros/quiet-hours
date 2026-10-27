@@ -16,7 +16,7 @@ function template(overrides: Partial<RecurringTemplateRow>): RecurringTemplateRo
     notes: null,
     spoon_estimate: 0.5,
     estimated_hours: 0.5,
-    complexity: "low",
+    complexity: "low", social_load: false, dread: false,
     billable: false,
     client_id: null,
     project_id: null,

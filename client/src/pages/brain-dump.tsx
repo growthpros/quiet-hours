@@ -48,12 +48,14 @@ import {
   markBrainDumpProcessed,
   markBrainDumpSkipped,
   remainingItemCount,
+  parsedItemCostFields,
   type BrainDumpRow,
   type ParsedTaskItem,
   DUE_BUCKET_LABEL,
   type DueBucket,
 } from "@/lib/tasks-data";
 import { useToast } from "@/hooks/use-toast";
+import { taskSpoons } from "@/lib/spoon-cost";
 import {
   TaskFieldsForm,
   fieldsToTaskInput,
@@ -227,9 +229,7 @@ function ReviewFlow({ dump, mode, open, onClose }: ReviewFlowProps) {
         await updateTask(currentFlowItem.taskId, {
           title: it.title,
           notes: it.notes ?? null,
-          spoonEstimate: it.spoon_estimate ?? null,
-          estimatedHours: it.estimated_hours ?? null,
-          complexity: it.complexity ?? null,
+          ...parsedItemCostFields(it),
           billable: it.billable ?? false,
           dueBucket,
           dueDate,
@@ -239,9 +239,7 @@ function ReviewFlow({ dump, mode, open, onClose }: ReviewFlowProps) {
         await createTask({
           title: it.title,
           notes: it.notes ?? null,
-          spoonEstimate: it.spoon_estimate ?? null,
-          estimatedHours: it.estimated_hours ?? null,
-          complexity: it.complexity ?? null,
+          ...parsedItemCostFields(it),
           billable: it.billable ?? false,
           dueBucket,
           dueDate,
@@ -291,9 +289,7 @@ function ReviewFlow({ dump, mode, open, onClose }: ReviewFlowProps) {
         const created = await createTask({
           title: s.title,
           notes: s.notes ?? null,
-          spoonEstimate: s.spoon_estimate ?? null,
-          estimatedHours: s.estimated_hours ?? null,
-          complexity: s.complexity ?? null,
+          ...parsedItemCostFields(s),
           billable: s.billable ?? false,
           dueBucket: "today",
         });
@@ -353,10 +349,12 @@ function ReviewFlow({ dump, mode, open, onClose }: ReviewFlowProps) {
     setEditValue({
       title: it.title,
       notes: it.notes ?? "",
-      spoonEstimate: it.spoon_estimate != null ? String(it.spoon_estimate) : "",
+      spoonEstimate: it.spoon_override != null ? String(it.spoon_override) : "",
       estimatedHours:
         it.estimated_hours != null ? String(it.estimated_hours) : "",
       complexity: it.complexity ?? "",
+      socialLoad: it.social_load ?? it.with_people ?? false,
+      dread: it.dread ?? false,
       timeline,
       specificDate,
       billable: it.billable ?? false,
@@ -376,9 +374,11 @@ function ReviewFlow({ dump, mode, open, onClose }: ReviewFlowProps) {
     const updated: ParsedTaskItem = {
       title: conv.title,
       notes: conv.notes ?? undefined,
-      spoon_estimate: conv.spoonEstimate ?? undefined,
+      spoon_override: conv.spoonEstimate ?? undefined,
       estimated_hours: conv.estimatedHours ?? undefined,
       complexity: conv.complexity ?? undefined,
+      social_load: conv.socialLoad,
+      dread: conv.dread,
       billable: conv.billable,
       // Preserve the AI's break_down_hint
       break_down_hint: currentFlowItem.item.break_down_hint,
@@ -469,13 +469,21 @@ function ReviewFlow({ dump, mode, open, onClose }: ReviewFlowProps) {
                 </div>
                 <p className="font-serif text-sm text-foreground">
                   {[
-                    currentItem.spoon_estimate != null
-                      ? `${currentItem.spoon_estimate} spoons`
-                      : null,
+                    (() => {
+                      const n = taskSpoons({
+                        spoon_estimate: currentItem.spoon_override ?? null,
+                        estimated_hours: currentItem.estimated_hours ?? null,
+                        complexity: currentItem.complexity ?? null,
+                        social_load: currentItem.social_load ?? currentItem.with_people,
+                        dread: currentItem.dread,
+                      });
+                      return n != null ? `${n} spoon${n === 1 ? "" : "s"}` : null;
+                    })(),
                     currentItem.estimated_hours != null
                       ? `${currentItem.estimated_hours}h`
                       : null,
-                    currentItem.complexity ?? null,
+                    currentItem.complexity ? `${currentItem.complexity} effort` : null,
+                    (currentItem.social_load ?? currentItem.with_people) ? "with people" : null,
                     currentItem.billable ? "billable" : null,
                   ]
                     .filter(Boolean)

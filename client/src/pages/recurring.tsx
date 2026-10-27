@@ -12,6 +12,8 @@
 // Deletion and pausing are confirmed with a Dialog rather than a browser
 // confirm() so the copy stays voice-consistent (no urgent language).
 
+import { SpoonCostFields, spoonCostError, type SpoonCostValue } from "@/components/spoon-cost-fields";
+import { DEFAULT_EFFORT } from "@/lib/spoon-cost";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
@@ -610,9 +612,8 @@ function TemplateCard({ template }: { template: RecurringTemplateRow }) {
 interface EditFormValue {
   title: string;
   notes: string;
-  spoon_estimate: string; // string so the input can be temporarily empty
-  estimated_hours: string;
-  complexity: "low" | "medium" | "high";
+  // Time, effort, the two yes/no questions, and an optional own number.
+  cost: SpoonCostValue;
   billable: boolean;
   pattern: RecurringPatternValue;
 }
@@ -621,9 +622,13 @@ function templateToEditForm(t: RecurringTemplateRow): EditFormValue {
   return {
     title: t.title,
     notes: t.notes ?? "",
-    spoon_estimate: String(t.spoon_estimate),
-    estimated_hours: String(t.estimated_hours),
-    complexity: t.complexity,
+    cost: {
+      spoonEstimate: t.spoon_estimate != null ? String(t.spoon_estimate) : "",
+      estimatedHours: String(t.estimated_hours),
+      complexity: t.complexity,
+      socialLoad: t.social_load ?? false,
+      dread: t.dread ?? false,
+    },
     billable: t.billable,
     pattern: {
       pattern_type: t.pattern_type,
@@ -669,10 +674,14 @@ function EditTemplateDialog({
       const title = value.title.trim();
       if (!title) throw new Error("Title is required.");
 
-      const spoonEstimate = Number.parseFloat(value.spoon_estimate || "0.5");
-      const estimatedHours = Number.parseFloat(
-        value.estimated_hours || "0.5",
-      );
+      const costError = spoonCostError(value.cost);
+      if (costError) throw new Error(costError);
+      // Empty spoons means "work it out from time and effort".
+      const spoonEstimate = value.cost.spoonEstimate.trim()
+        ? Number(value.cost.spoonEstimate)
+        : null;
+      const estimatedHours = Number.parseFloat(value.cost.estimatedHours || "0.5");
+      const complexity = value.cost.complexity || DEFAULT_EFFORT;
       const notes = value.notes.trim() || null;
 
       await updateRecurringTemplate(template.id, {
@@ -680,7 +689,9 @@ function EditTemplateDialog({
         notes,
         spoon_estimate: spoonEstimate,
         estimated_hours: estimatedHours,
-        complexity: value.complexity,
+        complexity,
+        social_load: value.cost.socialLoad,
+        dread: value.cost.dread,
         billable: value.billable,
         pattern_type: value.pattern.pattern_type,
         interval_n: value.pattern.interval_n,
@@ -705,7 +716,9 @@ function EditTemplateDialog({
           notes,
           spoon_estimate: spoonEstimate,
           estimated_hours: estimatedHours,
-          complexity: value.complexity,
+          complexity,
+          social_load: value.cost.socialLoad,
+          dread: value.cost.dread,
           billable: value.billable,
         },
       );
@@ -771,58 +784,12 @@ function EditTemplateDialog({
               data-testid="input-edit-notes"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="edit-spoons">
-                Spoons <span className="italic">0 to 10</span>
-              </Label>
-              <Input
-                id="edit-spoons"
-                type="number"
-                min={0}
-                max={10}
-                step={0.25}
-                value={value.spoon_estimate}
-                onChange={(e) =>
-                  setValue({ ...value, spoon_estimate: e.target.value })
-                }
-                data-testid="input-edit-spoons"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-hours">
-                Hours <span className="italic">15-min steps</span>
-              </Label>
-              <Input
-                id="edit-hours"
-                type="number"
-                min={0}
-                step={0.25}
-                value={value.estimated_hours}
-                onChange={(e) =>
-                  setValue({ ...value, estimated_hours: e.target.value })
-                }
-                data-testid="input-edit-hours"
-              />
-            </div>
-          </div>
-          <div>
-            <Label>Complexity</Label>
-            <div className="grid grid-cols-3 gap-2 pt-1">
-              {(["low", "medium", "high"] as const).map((c) => (
-                <Button
-                  key={c}
-                  type="button"
-                  variant={value.complexity === c ? "default" : "outline"}
-                  onClick={() => setValue({ ...value, complexity: c })}
-                  size="sm"
-                  data-testid={`button-edit-complexity-${c}`}
-                >
-                  {c[0].toUpperCase() + c.slice(1)}
-                </Button>
-              ))}
-            </div>
-          </div>
+          <SpoonCostFields
+            value={value.cost}
+            onChange={(cost) => setValue({ ...value, cost })}
+            idPrefix="edit"
+            allowNoEffort={false}
+          />
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"

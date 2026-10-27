@@ -44,7 +44,7 @@ The test project holds no real data. Use it freely. Production holds real users'
 
 **Database changes**
 
-- Every schema change is a new numbered file in `supabase/migrations/` (next is `015_...`). Never edit an applied migration.
+- Every schema change is a new numbered file in `supabase/migrations/` (next is `016_...`). Never edit an applied migration.
 - Apply it to the test project first and check it there.
 - Apply to production only after the pull request is approved, and only with Caroline's OK. If the app code depends on the change, apply it to production before merging.
 - Every new table that holds user data needs:

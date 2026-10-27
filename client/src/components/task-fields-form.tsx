@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Complexity, DueBucket } from "@/lib/tasks-data";
+import { SpoonCostFields, spoonCostError, type SpoonCostValue } from "@/components/spoon-cost-fields";
 
 // Timeline options shown to the user. Ordered by nearness. "Specific date"
 // is a special value that reveals a date input.
@@ -33,12 +34,10 @@ const TIMELINE_OPTIONS: Array<{
   { value: "specific_date", label: "Pick a specific date\u2026" },
 ];
 
-export interface TaskFieldsValue {
+export interface TaskFieldsValue extends SpoonCostValue {
   title: string;
   notes: string;
-  spoonEstimate: string; // strings so inputs behave; caller converts
-  estimatedHours: string;
-  complexity: Complexity | "";
+  // spoonEstimate and estimatedHours are strings so inputs behave; caller converts
   timeline: DueBucket | "specific_date";
   specificDate: string; // YYYY-MM-DD, only used when timeline === 'specific_date'
   billable: boolean;
@@ -51,6 +50,8 @@ export function defaultTaskFieldsValue(): TaskFieldsValue {
     spoonEstimate: "",
     estimatedHours: "",
     complexity: "",
+    socialLoad: false,
+    dread: false,
     timeline: "today",
     specificDate: "",
     billable: false,
@@ -99,68 +100,7 @@ export function TaskFieldsForm({
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor={`${idPrefix}-spoons`}>
-            Spoons{" "}
-            <span className="text-xs italic text-muted-foreground">
-              0 to 10
-            </span>
-          </Label>
-          <Input
-            id={`${idPrefix}-spoons`}
-            type="number"
-            min={0}
-            max={10}
-            step={0.5}
-            value={value.spoonEstimate}
-            onChange={(e) => set("spoonEstimate", e.target.value)}
-            data-testid={`${idPrefix}-spoons`}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor={`${idPrefix}-hours`}>
-            Hours{" "}
-            <span className="text-xs italic text-muted-foreground">
-              15-min steps
-            </span>
-          </Label>
-          <Input
-            id={`${idPrefix}-hours`}
-            type="number"
-            min={0}
-            max={200}
-            step={0.25}
-            value={value.estimatedHours}
-            onChange={(e) => set("estimatedHours", e.target.value)}
-            data-testid={`${idPrefix}-hours`}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label>Complexity</Label>
-        <div className="flex gap-2">
-          {(["low", "medium", "high"] as Complexity[]).map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() =>
-                set("complexity", value.complexity === c ? "" : c)
-              }
-              className={`flex-1 rounded-md border px-3 py-2 text-sm capitalize transition ${
-                value.complexity === c
-                  ? "border-primary bg-primary/10 text-foreground"
-                  : "border-border text-muted-foreground hover:bg-muted"
-              }`}
-              data-testid={`${idPrefix}-complexity-${c}`}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      </div>
+      <SpoonCostFields value={value} onChange={(c) => onChange({ ...value, ...c })} idPrefix={idPrefix} />
 
       <div className="space-y-1.5">
         <Label htmlFor={`${idPrefix}-timeline`}>Timeline</Label>
@@ -225,6 +165,8 @@ export function fieldsToTaskInput(
   spoonEstimate: number | null;
   estimatedHours: number | null;
   complexity: Complexity | null;
+  socialLoad: boolean;
+  dread: boolean;
   dueDate: string | null;
   dueBucket: DueBucket | null;
   billable: boolean;
@@ -232,21 +174,11 @@ export function fieldsToTaskInput(
   const title = v.title.trim();
   if (!title) return { error: "Title can't be empty." };
 
+  const costError = spoonCostError(v);
+  if (costError) return { error: costError };
+  // Empty spoons means "work it out from time and effort" (see spoon-cost.ts).
   const spoons = v.spoonEstimate.trim() ? Number(v.spoonEstimate) : null;
-  if (
-    v.spoonEstimate.trim() &&
-    (!Number.isFinite(spoons) || (spoons as number) < 0 || (spoons as number) > 10)
-  ) {
-    return { error: "Spoons must be a number between 0 and 10." };
-  }
-
   const hours = v.estimatedHours.trim() ? Number(v.estimatedHours) : null;
-  if (
-    v.estimatedHours.trim() &&
-    (!Number.isFinite(hours) || (hours as number) < 0)
-  ) {
-    return { error: "Hours must be a positive number." };
-  }
 
   let dueBucket: DueBucket | null = null;
   let dueDate: string | null = null;
@@ -264,8 +196,13 @@ export function fieldsToTaskInput(
     spoonEstimate: spoons,
     estimatedHours: hours,
     complexity: v.complexity || null,
+    socialLoad: v.socialLoad,
+    dread: v.dread,
     dueDate,
     dueBucket,
     billable: v.billable,
   };
 }
+
+/** What fieldsToTaskInput returns when the form is valid. */
+export type TaskInput = Exclude<ReturnType<typeof fieldsToTaskInput>, { error: string }>;
