@@ -49,6 +49,7 @@ Checked: tests, test database run, preview, live check.
 | 2026-10-25 | Future days are compared with "your usual" (the middle of the last 14 check-in budgets); each day's real budget still comes from that morning's check-in. | Caroline |
 | 2026-10-25 | The spoon numbers (daily budget formula, task costs, earn-back values) get researched before they're changed. | Caroline |
 | 2026-10-26 | Task spoons are worked out from time × effort (from the spoon research), and anyone can type their own number instead. | Caroline |
+| 2026-10-26 | When no effort is picked, a task counts as Medium. If the math comes out higher than expected, that's a nudge to pick the effort that fits. | Caroline |
 | 2026-10-26 | The spoon model changes go in as four small changes, in order: task spoons, daily budget, earn-back, then wording ("Check-in", "Your Wave", and the renamed phases). | Caroline |
 
 ## History
@@ -287,7 +288,7 @@ What changed:
 - The AI brain dump and task breakdown now suggest time, effort and "with people," not spoons, so every task's spoons come from the same math. Older brain dumps that carry an AI spoon guess are ignored.
 
 **Decisions:**
-See the Decisions table. Counting an unpicked effort as Medium is waiting for Caroline's OK.
+See the Decisions table (time × effort with your own number winning, Medium when no effort is picked, the four-change order).
 
 **Database:**
 Migration 015 adds `social_load` and `dread` to tasks and repeat templates, lets a repeat's spoon number be empty, and raises the limit to 60. Applied to the test database. Typed numbers already saved are unchanged, so existing repeats keep their numbers until someone clears the Spoons box. The real database needs it before merging, with Caroline's OK. The two AI functions need redeploying to the real project after merging, also with her OK (their new answers leave out the spoon guess the current live app still reads).
