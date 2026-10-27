@@ -43,7 +43,10 @@ import {
 } from "@/lib/burnout-utils";
 import { ChipMultiSelect } from "@/components/chip-multiselect";
 import { PULL_OPTIONS } from "@/lib/burnout-options-const";
-import { maybeIssueSpoonsFromCheckin } from "@/lib/spoon-data";
+import { issueSpoonsFromCheckin, type CheckinBudgetResult } from "@/lib/spoon-data";
+import { basisLine, loadDetail } from "@/lib/daily-budget";
+import { InfoTip } from "@/components/info-tip";
+import { EXPLAIN } from "@/lib/explainers";
 import type { BurnoutCheckinRow } from "@/lib/supabase";
 
 const ENERGY_SCALE = [
@@ -128,6 +131,43 @@ function stateLabel(id: string | null | undefined): string {
   return STATE_OPTIONS.find((s) => s.id === id)?.label ?? id;
 }
 
+// What the check-in did to today's spoons, shown after saving.
+function BudgetNote({ result }: { result: CheckinBudgetResult }) {
+  const spoons = Number(result.ledger.allotted);
+  const headline =
+    result.outcome === "set"
+      ? `Today starts with ${spoons} spoons.`
+      : result.outcome === "lowered"
+        ? `Today is now ${spoons} spoons.`
+        : `Today stays at ${spoons} spoons.`;
+  return (
+    <div
+      className="w-full max-w-md rounded-md border border-border/70 bg-muted/30 p-3 text-left"
+      data-testid="checkin-budget-note"
+    >
+      <p className="flex items-center gap-1.5 font-serif text-sm font-medium text-foreground">
+        {headline}
+        <InfoTip label="today's spoons" testId="info-checkin-budget">
+          <p>{EXPLAIN.budgetMath}</p>
+          <p className="text-muted-foreground">{EXPLAIN.estimateNote}</p>
+        </InfoTip>
+      </p>
+      {result.outcome !== "kept" ? (
+        <>
+          <p className="mt-1 text-xs text-muted-foreground">{basisLine(result.basis)}</p>
+          {result.basis.loads.length > 0 && (
+            <p className="mt-0.5 text-xs text-muted-foreground">Other load: {loadDetail(result.basis)}</p>
+          )}
+        </>
+      ) : (
+        <p className="mt-1 text-xs text-muted-foreground">
+          This check-in worked out to {result.basis.spoons}. A later check-in can lower today, never raise it.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ---------------- Check-in card ----------------
 function CheckinCard() {
   useToast(); // reserved for future toasts on this card
@@ -139,6 +179,7 @@ function CheckinCard() {
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [note, setNote] = useState("");
   const [saved, setSaved] = useState(false);
+  const [budgetResult, setBudgetResult] = useState<CheckinBudgetResult | null>(null);
 
   const reset = () => {
     setStep(1);
@@ -148,6 +189,7 @@ function CheckinCard() {
     setPulls([]);
     setSymptoms([]);
     setNote("");
+    setBudgetResult(null);
   };
 
   const save = useMutation({
@@ -178,13 +220,16 @@ function CheckinCard() {
             created_at: Number(created.createdAt ?? created.created_at ?? Date.now()),
           };
           try {
-            await maybeIssueSpoonsFromCheckin(row);
-          } catch {
-            // If spoon issuance fails, don't block the check-in save.
+            setBudgetResult(await issueSpoonsFromCheckin(row));
+          } catch (e) {
+            // The check-in itself saved; a budget failure shouldn't undo it.
+            // Logged so it isn't silent, and the meter still invites a check-in.
+            console.error("Couldn't set today's spoons from the check-in", e);
           }
         }
-      } catch {
-        // Parse failure is fine; the check-in still saved.
+      } catch (e) {
+        // The check-in still saved; only the spoon budget is skipped.
+        console.error("Couldn't read the saved check-in", e);
       }
     },
     onSuccess: () => {
@@ -230,6 +275,7 @@ function CheckinCard() {
               Noticing is the whole practice. The rest can wait.
             </p>
           </div>
+          {budgetResult && <BudgetNote result={budgetResult} />}
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               onClick={() => {
@@ -306,8 +352,11 @@ function CheckinCard() {
         {step === 1 && (
           <div className="space-y-4">
             <div className="space-y-1">
-              <h2 className="font-serif text-lg font-medium text-foreground">
+              <h2 className="flex items-center gap-1.5 font-serif text-lg font-medium text-foreground">
                 Where is your energy right now?
+                <InfoTip label="energy">
+                  <p>{EXPLAIN.energy}</p>
+                </InfoTip>
               </h2>
               <p className="font-serif text-sm italic text-muted-foreground">
                 Not what you wish it were. Just what it is.
@@ -325,8 +374,11 @@ function CheckinCard() {
         {step === 2 && (
           <div className="space-y-4">
             <div className="space-y-1">
-              <h2 className="font-serif text-lg font-medium text-foreground">
+              <h2 className="flex items-center gap-1.5 font-serif text-lg font-medium text-foreground">
                 How loud does the world feel?
+                <InfoTip label="sensory input">
+                  <p>{EXPLAIN.sensory}</p>
+                </InfoTip>
               </h2>
               <p className="font-serif text-sm italic text-muted-foreground">
                 Sound, light, texture, screens, other people — how much is
@@ -345,8 +397,11 @@ function CheckinCard() {
         {step === 3 && (
           <div className="space-y-4">
             <div className="space-y-1">
-              <h2 className="font-serif text-lg font-medium text-foreground">
+              <h2 className="flex items-center gap-1.5 font-serif text-lg font-medium text-foreground">
                 What kind of state are you in?
+                <InfoTip label="state">
+                  <p>{EXPLAIN.state}</p>
+                </InfoTip>
               </h2>
               <p className="font-serif text-sm italic text-muted-foreground">
                 Not how bad or good — what kind. This one matters most.
@@ -413,8 +468,11 @@ function CheckinCard() {
         {step === 4 && (
           <div className="space-y-4">
             <div className="space-y-1">
-              <h2 className="font-serif text-lg font-medium text-foreground">
+              <h2 className="flex items-center gap-1.5 font-serif text-lg font-medium text-foreground">
                 Anything in the body?
+                <InfoTip label="body signals">
+                  <p>{EXPLAIN.bodySignals}</p>
+                </InfoTip>
               </h2>
               <p className="font-serif text-sm italic text-muted-foreground">
                 All optional. Tap whatever's true.

@@ -76,6 +76,8 @@ export interface UserProfileRow {
   checkin_cadence_minutes: number | null;
   // Which day the week starts: 0 Sunday, 1 Monday, 6 Saturday (migration 014).
   week_starts_on: WeekStart;
+  // Spoons on an ordinary okay day, 4 to 30; null means use 12 (migration 016).
+  usual_budget: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -129,6 +131,7 @@ export async function updateProfile(
       | "checkin_cadence"
       | "checkin_cadence_minutes"
       | "week_starts_on"
+      | "usual_budget"
     >
   >,
 ): Promise<UserProfileRow> {

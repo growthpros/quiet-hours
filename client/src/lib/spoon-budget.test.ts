@@ -1,11 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
-  STARTING_BUDGET,
   dayBudget,
   spentToday,
   spoonsOverIfAdded,
   todayBudget,
-  usualBudget,
 } from "@/lib/spoon-budget";
 
 // Tests run in US Eastern time (see vitest.config.ts).
@@ -13,22 +11,6 @@ const TODAY = "2026-10-21";
 const at = (iso: string, hour: number) => new Date(`${iso}T${String(hour).padStart(2, "0")}:00:00`).getTime();
 const t = (o: Partial<{ spoon_estimate: number | null; estimated_hours: number | null; complexity: "low" | "medium" | "high" | null; completed_at: number | null; due_date: string | null; due_bucket: "today" | "this_week" | null; archived_at: string | null }>) => ({
   spoon_estimate: null, completed_at: null, due_date: null, due_bucket: null, archived_at: null, recurring_template_id: null, ...o,
-});
-
-describe("your usual budget", () => {
-  it("is the starting budget with no check-ins yet", () => {
-    expect(usualBudget([])).toBe(STARTING_BUDGET);
-    expect(usualBudget([0, 0])).toBe(STARTING_BUDGET);
-  });
-  it("is the middle of the last 14 check-in budgets, to the half spoon", () => {
-    expect(usualBudget([10, 14, 11])).toBe(11);
-    expect(usualBudget([10, 11, 12, 15])).toBe(11.5);
-    expect(usualBudget([9, 9.5])).toBe(9.5); // 9.25 rounds to the nearest half
-  });
-  it("only looks at the 14 most recent", () => {
-    const recent = Array(14).fill(8);
-    expect(usualBudget([...recent, 20, 20, 20, 20, 20])).toBe(8);
-  });
 });
 
 describe("today's budget", () => {

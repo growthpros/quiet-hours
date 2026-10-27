@@ -57,7 +57,7 @@ export function SpoonMeter() {
   const qc = useQueryClient();
   const [showEarnPanel, setShowEarnPanel] = useState(false);
   const { date, isToday } = useViewingDate();
-  const { usual } = useSpoonBudget();
+  const { usual, usualSet, ready: profileReady } = useSpoonBudget();
 
   const ledgerQ = useQuery<SpoonLedgerRow>({
     queryKey: ["/api/spoon/ledger", date],
@@ -165,6 +165,8 @@ export function SpoonMeter() {
   const remaining = Math.max(0, total - spent - committed);
 
   const noAllotment = !ledger || Number(ledger.allotted) === 0;
+  // What went into the budget, for days set after migration 016.
+  const basis = !noAllotment && ledger?.budget_basis ? ledger.budget_basis : null;
 
   // Count today's events per action, so cap status is visible on the chips
   const perActionCount = new Map<number, number>();
@@ -199,10 +201,32 @@ export function SpoonMeter() {
               >
                 {noAllotment
                   ? isToday
-                    ? `Until you check in, plans use your usual ${usual} spoons. A check-in sets today's real number from how you are right now.`
+                    ? `Until you check in, plans use your ordinary okay day of ${usual} spoons. A check-in sets today's real number from how you are right now.`
                     : "No allotment was issued this day. It happens when you skip the morning check-in."
                   : "How much energy you had, and how much was spoken for."}
               </p>
+              {basis && (
+                <p
+                  className="mt-1 flex flex-wrap items-center gap-1 text-xs"
+                  style={{ color: C.inkMute }}
+                  data-testid="spoon-basis"
+                >
+                  {basisLine(basis)}
+                  <InfoTip label="today's number" testId="info-spoon-basis">
+                    <p>{EXPLAIN.budgetMath}</p>
+                    {basis.loads.length > 0 && <p>Other load: {loadDetail(basis)}</p>}
+                    <p className="text-muted-foreground">{EXPLAIN.estimateNote}</p>
+                  </InfoTip>
+                </p>
+              )}
+              {isToday && !usualSet && profileReady && (
+                <p className="mt-1 text-xs" data-testid="ordinary-day-invite">
+                  <Link href="/settings" className="underline underline-offset-2" style={{ color: C.inkSoft }}>
+                    What does an ordinary okay day look like for you?
+                  </Link>{" "}
+                  <span style={{ color: C.inkMute }}>Until you say, the app uses 12 spoons.</span>
+                </p>
+              )}
             </div>
             {noAllotment && isToday && (
               <Link href="/burnout">
@@ -219,11 +243,11 @@ export function SpoonMeter() {
             <>
               {/* Values row */}
               <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 mb-4" data-testid="spoon-values">
-                <MeterValue label="Total" value={fmt(total)} accent={C.ink} />
-                <MeterValue label="Spent" value={fmt(spent)} accent={C.terracotta} />
-                <MeterValue label="Committed" value={fmt(committed)} accent={C.amber} />
-                <MeterValue label="Earned back" value={"+" + fmt(earned)} accent={C.moss} />
-                <MeterValue label="Free" value={fmt(remaining)} accent={C.sage} strong />
+                <MeterValue label="Total" value={fmt(total)} accent={C.ink} info={EXPLAIN.total} />
+                <MeterValue label="Spent" value={fmt(spent)} accent={C.terracotta} info={EXPLAIN.spent} />
+                <MeterValue label="Committed" value={fmt(committed)} accent={C.amber} info={EXPLAIN.committed} />
+                <MeterValue label="Earned back" value={"+" + fmt(earned)} accent={C.moss} info={EXPLAIN.earnedBack} />
+                <MeterValue label="Free" value={fmt(remaining)} accent={C.sage} strong info={EXPLAIN.free} />
               </div>
 
               {/* Progress bar.
@@ -376,19 +400,26 @@ function MeterValue({
   value,
   accent,
   strong,
+  info,
 }: {
   label: string;
   value: string;
   accent: string;
   strong?: boolean;
+  info?: string;
 }) {
   return (
     <div>
       <div
-        className="text-[10px] uppercase tracking-[0.14em] font-bold"
+        className="flex items-center gap-0.5 text-[10px] uppercase tracking-[0.14em] font-bold"
         style={{ color: C.inkMute }}
       >
         {label}
+        {info && (
+          <InfoTip label={label.toLowerCase()}>
+            <p>{info}</p>
+          </InfoTip>
+        )}
       </div>
       <div
         className="font-serif tabular-nums leading-none mt-1"
@@ -414,6 +445,9 @@ import {
 import { committedSpoonsToday } from "@/lib/task-timeframe";
 import { localIsoDate } from "@/lib/local-date";
 import { useSpoonBudget } from "@/lib/use-spoon-budget";
+import { InfoTip } from "@/components/info-tip";
+import { EXPLAIN } from "@/lib/explainers";
+import { basisLine, loadDetail } from "@/lib/daily-budget";
 
 interface EarnBackPanelProps {
   actions: EarnBackActionRow[];

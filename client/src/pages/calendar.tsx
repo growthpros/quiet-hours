@@ -2,6 +2,7 @@
 // tasks that still need a day. Tasks can be dragged between days; dragging
 // follows the same rules as the Move menu (lib/task-move.ts).
 
+import { InfoTip } from "@/components/info-tip";
 import { spoonsOf, taskSpoons } from "@/lib/spoon-cost";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -93,12 +94,14 @@ interface DragState {
 const AMBER = "#D9A55E";
 
 function budgetLine(b: DayBudget): string {
-  const whose = b.basis === "checkin" ? "today's" : "your usual";
-  return `About ${fmt(b.load)} of ${whose} ${fmt(b.budget)} spoons`;
+  return b.basis === "checkin"
+    ? `About ${fmt(b.load)} of today's ${fmt(b.budget)} spoons`
+    : `About ${fmt(b.load)} of the ${fmt(b.budget)} spoons in an ordinary okay day`;
 }
 
 const USUAL_EXPLAINED =
-  "Your usual is the middle of your last 14 check-in budgets (12 until you've checked in a few times). Each day's real budget comes from that morning's check-in.";
+  "Days ahead are planned with your ordinary okay day, which you can set in Settings. Each day's real number comes from that day's check-in.";
+const TODAY_EXPLAINED = "Today's number comes from your check-in, plus any spoons earned back.";
 
 export default function Calendar() {
   const today = localIsoDate();
@@ -540,10 +543,12 @@ function DayColumn({ day, drag }: { day: CalendarDay; drag: DragState }) {
       {b?.over ? (
         <p
           className="mb-2 text-[11px] leading-snug text-foreground/80"
-          title={b.basis === "usual" ? USUAL_EXPLAINED : "Today's budget comes from this morning's check-in, plus any spoons earned back."}
           data-testid={`over-${day.iso}`}
         >
-          {budgetLine(b)}
+          {budgetLine(b)}{" "}
+          <InfoTip label="this day's spoons" testId={`info-over-${day.iso}`}>
+            <p>{b.basis === "usual" ? USUAL_EXPLAINED : TODAY_EXPLAINED}</p>
+          </InfoTip>
         </p>
       ) : (
         <div className="mb-2" />
