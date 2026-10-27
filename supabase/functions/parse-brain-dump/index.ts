@@ -27,7 +27,7 @@ For each proposed task:
 
 Do NOT infer: recurring, tags, client name, project name, due date, due bucket.
 
-Return ONLY valid JSON:
+Return ONLY valid JSON, compact:
 {"items":[{"title":"string","notes":"string (optional)","estimated_hours":number,"complexity":"low"|"medium"|"high","with_people":boolean,"billable":boolean,"break_down_hint":boolean}]}
 
 If no actionable items, return {"items": []}.`;

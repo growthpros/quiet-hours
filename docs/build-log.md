@@ -296,6 +296,23 @@ Migration 015 adds `social_load` and `dread` to tasks and repeat templates, lets
 **Checked:**
 139 tests, including the research table and examples, typed numbers winning, and the meter, budget and Calendar counting tasks that only have a time. These budget tests fail on the old code. In a real browser against the test database: the meter counted a one-hour task with no spoons as 2; a one-hour, medium, with-people, dreaded call showed "4 spoons" with the math, a typed 3 showed "The math says 4 spoons," "Use the math" cleared it, and the saved task kept an empty spoon number with both boxes ticked; the next task went half a spoon over and opened the prompt; the repeat editor showed the math; the form fit a phone screen.
 
+### 2026-10-26: AI features redeployed, code matches what's live
+
+**What and why:**
+The two AI features (brain dump sorting and task breakdown) run on Supabase, so merging code doesn't update them. They were redeployed to the real project after #38, which also shipped the #36 wording fix. Before deploying, the live copies were compared with the code. Two small differences favored the live copies, so the code now matches them:
+
+- Brain dump asks the AI for "compact" JSON, which keeps long brain dumps from running out of room.
+- When task breakdown hits a problem, it sends the real reason back with a normal response, the same way brain dump does, so the app shows that reason instead of a generic error.
+
+**Decisions:**
+None (Caroline gave her OK to deploy).
+
+**Database:**
+No change. Functions deployed to the real project: parse-brain-dump version 5, break-down-task version 3. Sign-in is still required to use them.
+
+**Checked:**
+The deployed files were read back from the real project and match this pull request line for line. Previews still can't run the AI features (the test database has no functions), so the first real use is on the live app.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:

@@ -96,11 +96,13 @@ Deno.serve(async (req) => {
       },
     );
   } catch (e) {
+    // Sent back as 200 with an error body, the same as parse-brain-dump, so
+    // the app can show the real reason instead of a generic "non-2xx" error.
     const message = e instanceof Error ? e.message : String(e);
     return new Response(
       JSON.stringify({ error: message }),
       {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, "content-type": "application/json" },
       },
     );
