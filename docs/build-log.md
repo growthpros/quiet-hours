@@ -50,6 +50,7 @@ Checked: tests, test database run, preview, live check.
 | 2026-10-25 | The spoon numbers (daily budget formula, task costs, earn-back values) get researched before they're changed. | Caroline |
 | 2026-10-26 | Task spoons are worked out from time × effort (from the spoon research), and anyone can type their own number instead. | Caroline |
 | 2026-10-26 | When no effort is picked, a task counts as Medium. If the math comes out higher than expected, that's a nudge to pick the effort that fits. | Caroline |
+| 2026-10-29 | Keep using caroline@carolinehinton.com as the one account. Delete the old account from the original build, data and all; the old data isn't needed. | Caroline |
 | 2026-10-27 | Each day's spoons start from the person's "ordinary okay day" (8, 12, 16, 20 or 24 spoons, or their own number from 4 to 30; 12 until they choose), scaled by energy and reduced by other load, as in the spoon research. | Caroline |
 | 2026-10-27 | The ordinary-day question lives in Settings, with an invitation on the spoon meter until it's set. The onboarding version comes with change 4. | Caroline |
 | 2026-10-27 | "Wired but tired" counts as a body signal (5%). The research's "fatigue counts 0" rule doesn't apply, because there's no plain fatigue chip. | Caroline |
@@ -364,6 +365,20 @@ Migration 016 adds `usual_budget` to profiles (empty means 12) and `budget_basis
 - In the task form, the ⓘ opened without closing the form or ticking the checkbox next to it.
 - On a phone-width screen, the ⓘ boxes stayed on screen with no sideways scrolling.
 
+### 2026-10-29: Old account removed from the real database (no pull request)
+
+**What and why:**
+On her phone, Caroline's live account looked empty. Her computer had been on a preview, which uses the test database, and her real data from the original build (280 tasks, 10 repeats and 26 check-ins, July to September) sat under a different email from the one she uses now. She chose to keep her current account and delete the old one.
+
+**Decisions:**
+See the Decisions table.
+
+**Database:**
+With Caroline's explicit OK, the old login was deleted on the real database. Every table that holds a person's data is set to delete with the login (the same path as "Delete my account," migration 013), so all of its data went with it. No schema change.
+
+**Checked:**
+Before deleting, the email was matched exactly and all 19 data tables were confirmed to delete with the login. Afterward, nothing was left for the old account, and Caroline's current account was unchanged.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
@@ -377,6 +392,10 @@ Things noticed along the way that aren't scheduled yet:
 - Fonts load from Google's servers, which see visitors' IP addresses. Hosting them with the app would stop that.
 - The Archived filter on the Tasks page compares dates using UTC. It's minor, but it should use the local date like everything else.
 - The two or three early-look testers are still to be chosen.
+- The real database still has three accounts with no data that were each used once in July (two gmail.com addresses and caroline@growthpartnerpros.com, which never signed in). Decide whether to remove them before beta.
+- Previews and the live app look the same, which makes it easy to be in the wrong one. A "Test version" strip on previews would help.
+- On a phone, Settings isn't on the bottom bar. Part of the views and mobile pass.
+- The Tasks page shows an empty list when tasks fail to load, instead of saying something went wrong.
 - The test database has no Edge Functions (and no Anthropic key), so AI brain dump sorting and task breakdown don't work on previews.
 - Spoon numbers: task costs (change 1) and the daily budget (change 2) now follow the research. Earn-back values are next (change 3), then the wording (change 4). Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins.
 - The check-in state descriptions still contain em dashes. Part of change 4's wording pass.
