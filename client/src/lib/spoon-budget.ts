@@ -1,10 +1,9 @@
 // How many spoons a day has, and whether a day's plan goes over them.
 //
-// Today: the budget from this morning's check-in plus anything earned back.
-// Before the check-in, and for future days, the app uses "your usual": the
-// middle value of your last 14 check-in budgets (12, the app's starting
-// point, until there are any). A future day's real budget is set by that
-// day's check-in, when the app knows more.
+// Today: the budget from the check-in plus anything earned back. Before the
+// check-in, and for future days, the app uses "your usual": the person's
+// ordinary okay day (12 until they set it; see daily-budget.ts). A future
+// day's real budget is set by that day's check-in, when the app knows more.
 //
 // Task costs come from spoon-cost.ts (typed, or time × effort). This file
 // only decides how they're compared with the day's budget.
@@ -14,31 +13,13 @@ import { committedSpoonsToday } from "@/lib/task-timeframe";
 import { localIsoDate } from "@/lib/local-date";
 import type { TaskRow } from "@/lib/tasks-data";
 
-/** The app's starting budget before there's any check-in history. */
-export const STARTING_BUDGET = 12;
-/** How many recent check-in budgets "your usual" looks at. */
-export const USUAL_WINDOW = 14;
-
-/** The middle value of the most recent budgets, to the nearest half spoon. */
-export function usualBudget(recentAllotments: number[]): number {
-  const values = recentAllotments
-    .map(Number)
-    .filter((v) => Number.isFinite(v) && v > 0)
-    .slice(0, USUAL_WINDOW)
-    .sort((a, b) => a - b);
-  if (values.length === 0) return STARTING_BUDGET;
-  const mid = Math.floor(values.length / 2);
-  const median = values.length % 2 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
-  return Math.round(median * 2) / 2;
-}
-
 export interface LedgerNumbers {
   allotted: number;
   spent: number;
   earned_back: number;
 }
 
-/** Today's spoons: the check-in budget (or your usual before it) plus earned back. */
+/** A day's spoons: the check-in budget (or your usual without one) plus earned back. */
 export function todayBudget(
   ledger: LedgerNumbers | null | undefined,
   usual: number,

@@ -5,7 +5,10 @@ import { supabase } from "@/lib/supabase";
 import type { BurnoutCheckinRow } from "@/lib/supabase";
 import { DEFAULT_EARN_BACK } from "@/lib/spoon-defaults";
 import { getOrCreateProfile, updateProfile } from "@/lib/foundation-data";
-import { localIsoDate } from "@/lib/local-date";
+import { addLocalDays, localIsoDate } from "@/lib/local-date";
+import { cleanUsual, dailyBudget, nextAllotment, wasBigDay, type BudgetBasis } from "@/lib/daily-budget";
+import { spentToday, todayBudget } from "@/lib/spoon-budget";
+import { listTasks } from "@/lib/tasks-data";
 
 // ---------- Types ----------
 export interface SpoonLedgerRow {
@@ -16,6 +19,8 @@ export interface SpoonLedgerRow {
   committed: number;
   spent: number;
   earned_back: number;
+  /** What went into the budget (migration 016); null for older days. */
+  budget_basis: BudgetBasis | null;
   created_at: number;
   updated_at: number;
 }
@@ -75,40 +80,15 @@ async function requireUserId(): Promise<string> {
   return id;
 }
 
-// ---------- Spoon issuance formula ----------
-// spoons = 12 + energy_score - (sensory - 3) - state_penalty - body_count/2
-// Cap between 6 and 20.
-const STATE_PENALTY: Record<string, number> = {
-  grounded: 0,
-  drifting: 1,
-  chasing: 2,
-  numbing: 3,
-  frozen: 4,
-};
-
-export function calculateSpoons(input: {
-  energy: number;
-  sensory: number;
-  state: string | null;
-  bodySignalCount: number;
-}): number {
-  const base = 12;
-  const energyContribution = input.energy - 3; // 3 is neutral
-  const sensoryPenalty = input.sensory - 3;
-  const statePenalty = input.state ? (STATE_PENALTY[input.state] ?? 0) : 0;
-  const bodyPenalty = input.bodySignalCount / 2;
-  const raw = base + energyContribution - sensoryPenalty - statePenalty - bodyPenalty;
-  const clamped = Math.max(6, Math.min(20, raw));
-  return Math.round(clamped * 2) / 2; // half-spoon precision
-}
-
-// Extract body-signal count from a check-in's symptoms JSON string
+// Body signals ticked in a check-in (stored as a JSON array string).
 function bodyCountFrom(symptomsJson: string | null): number {
   if (!symptomsJson) return 0;
   try {
     const arr = JSON.parse(symptomsJson);
     return Array.isArray(arr) ? arr.length : 0;
-  } catch {
+  } catch (e) {
+    // An unreadable list counts as no signals rather than blocking the budget.
+    console.warn("Couldn't read check-in body signals", e);
     return 0;
   }
 }
@@ -142,6 +122,7 @@ export async function getOrCreateLedgerForDate(ymd: string): Promise<SpoonLedger
       committed: 0,
       spent: 0,
       earned_back: 0,
+      budget_basis: null,
       created_at: 0,
       updated_at: 0,
     };
@@ -166,7 +147,7 @@ export async function getOrCreateLedgerForDate(ymd: string): Promise<SpoonLedger
   return created as SpoonLedgerRow;
 }
 
-async function patchLedger(patch: Partial<Pick<SpoonLedgerRow, "allotted" | "committed" | "spent" | "earned_back">>): Promise<SpoonLedgerRow> {
+async function patchLedger(patch: Partial<Pick<SpoonLedgerRow, "allotted" | "committed" | "spent" | "earned_back" | "budget_basis">>): Promise<SpoonLedgerRow> {
   const user_id = await requireUserId();
   const today = localIsoDate();
   await getOrCreateTodayLedger();
@@ -181,34 +162,39 @@ async function patchLedger(patch: Partial<Pick<SpoonLedgerRow, "allotted" | "com
   return data as SpoonLedgerRow;
 }
 
-// The most recent days' check-in budgets, newest first, for "your usual"
-// (see spoon-budget.ts). Days without a check-in have allotted 0 and are
-// left out.
-export async function listRecentAllotments(limit: number): Promise<number[]> {
-  const { data, error } = await supabase
-    .from("spoon_ledger")
-    .select("allotted, log_date")
-    .gt("allotted", 0)
-    .order("log_date", { ascending: false })
-    .limit(limit);
-  if (error) throw error;
-  return (data ?? []).map((r: { allotted: number }) => Number(r.allotted));
+export interface CheckinBudgetResult {
+  ledger: SpoonLedgerRow;
+  basis: BudgetBasis;
+  /** "set" for the day's first budget, "lowered" when a later check-in lowered it, "kept" otherwise. */
+  outcome: "set" | "lowered" | "kept";
 }
 
-// Called from the burnout check-in flow. If today's ledger has no allotment
-// yet, issue one now based on this check-in. If it already has one, leave it.
-export async function maybeIssueSpoonsFromCheckin(checkin: BurnoutCheckinRow): Promise<SpoonLedgerRow> {
-  const ledger = await getOrCreateTodayLedger();
-  if (ledger.allotted > 0) return ledger; // already issued for the day
+// Called after every check-in (see daily-budget.ts). The first check-in of
+// the day sets the budget; a later one can lower it, never raise it.
+export async function issueSpoonsFromCheckin(checkin: BurnoutCheckinRow): Promise<CheckinBudgetResult> {
+  const yesterday = localIsoDate(addLocalDays(new Date(), -1));
+  const [ledger, profile, yLedger, tasks] = await Promise.all([
+    getOrCreateTodayLedger(),
+    getOrCreateProfile(),
+    getOrCreateLedgerForDate(yesterday),
+    listTasks(),
+  ]);
+  const usual = cleanUsual(profile.usual_budget);
+  const yBudget = todayBudget(yLedger, usual).budget;
+  const ySpent = spentToday(tasks, Number(yLedger.spent || 0), yesterday);
 
-  const spoons = calculateSpoons({
+  const basis = dailyBudget({
+    usual,
     energy: checkin.energy,
     sensory: checkin.sensory,
     state: checkin.state,
-    bodySignalCount: bodyCountFrom(checkin.symptoms),
+    bodySignals: bodyCountFrom(checkin.symptoms),
+    yesterdayWasBig: wasBigDay(ySpent, yBudget),
   });
-
-  return patchLedger({ allotted: spoons });
+  const next = nextAllotment(Number(ledger.allotted), basis.spoons);
+  if (!next.changed) return { ledger, basis, outcome: "kept" };
+  const updated = await patchLedger({ allotted: next.allotted, budget_basis: basis });
+  return { ledger: updated, basis, outcome: Number(ledger.allotted) > 0 ? "lowered" : "set" };
 }
 
 // ---------- Earn-back actions ----------

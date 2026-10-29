@@ -50,6 +50,11 @@ Checked: tests, test database run, preview, live check.
 | 2026-10-25 | The spoon numbers (daily budget formula, task costs, earn-back values) get researched before they're changed. | Caroline |
 | 2026-10-26 | Task spoons are worked out from time × effort (from the spoon research), and anyone can type their own number instead. | Caroline |
 | 2026-10-26 | When no effort is picked, a task counts as Medium. If the math comes out higher than expected, that's a nudge to pick the effort that fits. | Caroline |
+| 2026-10-29 | Keep using caroline@carolinehinton.com as the one account. Delete the old account from the original build, data and all; the old data isn't needed. | Caroline |
+| 2026-10-27 | Each day's spoons start from the person's "ordinary okay day" (8, 12, 16, 20 or 24 spoons, or their own number from 4 to 30; 12 until they choose), scaled by energy and reduced by other load, as in the spoon research. | Caroline |
+| 2026-10-27 | The ordinary-day question lives in Settings, with an invitation on the spoon meter until it's set. The onboarding version comes with change 4. | Caroline |
+| 2026-10-27 | "Wired but tired" counts as a body signal (5%). The research's "fatigue counts 0" rule doesn't apply, because there's no plain fatigue chip. | Caroline |
+| 2026-10-27 | Labels get an ⓘ that explains them, starting with everything the spoon model touches. | Caroline |
 | 2026-10-26 | The spoon model changes go in as four small changes, in order: task spoons, daily budget, earn-back, then wording ("Check-in", "Your Wave", and the renamed phases). | Caroline |
 
 ## History
@@ -313,6 +318,67 @@ No change. Functions deployed to the real project: parse-brain-dump version 5, b
 **Checked:**
 The deployed files were read back from the real project and match this pull request line for line. Previews still can't run the AI features (the test database has no functions), so the first real use is on the live app.
 
+### 2026-10-27: Daily spoons from your ordinary okay day (spoon model, change 2)
+
+**What and why:**
+The check-in started everyone at 12 spoons and added or took away whole spoons: Bright added 2, Frozen took away 4, and each body signal took away half a spoon. Only the first check-in of the day counted. None of it was tied to the person.
+
+What changed:
+
+- **Ordinary okay day.** A new Settings card asks "On an ordinary okay day, how much can you get through?" The choices run from about 4 hours (8 spoons) to about 12 hours (24 spoons), or the person's own number from 4 to 30. Until they choose, the app uses 12, and the spoon meter invites them to set it.
+- **The check-in works from that number:**
+  - Energy scales it: Depleted 60%, Low 80%, Steady 100%, Present 105%, Bright 110%.
+  - Other load takes a share off, never more than 30% in total:
+    - Sensory: Noticeable 5%, A lot 10%, Overloaded 20%
+    - State: Drifting or Chasing 5%, Numbing 10%, Frozen 15%
+    - Body signals: 5% each, up to 15%
+    - Yesterday over 110% of its budget: 10%
+  - Today stays between 40% and 110% of the ordinary day.
+- **Later check-ins** can lower today's number, never raise it.
+- **Showing the math.** After a check-in, the app shows what it did (for example "Today starts with 9 spoons," with the math and the other load). The meter shows the same line, like "Ordinary day 16 · Low energy 80% · Other load −30% = 9 spoons."
+- **Future days.** "Your usual" for future days and before the check-in is now the ordinary okay day. It used to be the middle of the last 14 budgets, which would only echo the ordinary day back once budgets come from it.
+- **ⓘ explanations.** A tap-to-open ⓘ (it works on phones, where hover tooltips don't) now sits on:
+  - the four check-in questions
+  - the meter's numbers and its math line
+  - the ordinary-day card
+  - Effort, the two yes/no questions and Spoons in the task form
+  - the Calendar's over-budget line
+
+  All the wording lives in one file, `lib/explainers.ts`.
+- A failed spoon budget after a check-in is now logged instead of silently ignored.
+
+**Decisions:**
+See the Decisions table.
+
+**Database:**
+Migration 016 adds `usual_budget` to profiles (empty means 12) and `budget_basis` to each day's spoons (what went into the number, so the meter can show it). Applied to the test database. Needed on the real database before merging, with Caroline's OK. Past days and any budget already set today are unchanged.
+
+**Checked:**
+147 tests, including the research example (ordinary day 12, Low energy, a lot of sensory input, drifting, a headache = 7.5), the caps, the big-day rule and later check-ins only lowering. In a real browser against the test database:
+
+- The meter invited setting the ordinary day.
+- The ⓘ in Settings opened, 16 saved, and an own number of 40 couldn't be saved.
+- After a big day, a Low, a lot of sensory input, drifting, headache check-in gave 9 spoons with the math.
+- A calmer second check-in kept 9.
+- A Depleted, overloaded, frozen third check-in lowered it to 6.5, and the saved math matched.
+- The meter showed the math line and every ⓘ opened.
+- In the task form, the ⓘ opened without closing the form or ticking the checkbox next to it.
+- On a phone-width screen, the ⓘ boxes stayed on screen with no sideways scrolling.
+
+### 2026-10-29: Old account removed from the real database (no pull request)
+
+**What and why:**
+On her phone, Caroline's live account looked empty. Her computer had been on a preview, which uses the test database, and her real data from the original build (280 tasks, 10 repeats and 26 check-ins, July to September) sat under a different email from the one she uses now. She chose to keep her current account and delete the old one.
+
+**Decisions:**
+See the Decisions table.
+
+**Database:**
+With Caroline's explicit OK, the old login was deleted on the real database. Every table that holds a person's data is set to delete with the login (the same path as "Delete my account," migration 013), so all of its data went with it. No schema change.
+
+**Checked:**
+Before deleting, the email was matched exactly and all 19 data tables were confirmed to delete with the login. Afterward, nothing was left for the old account, and Caroline's current account was unchanged.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
@@ -326,8 +392,13 @@ Things noticed along the way that aren't scheduled yet:
 - Fonts load from Google's servers, which see visitors' IP addresses. Hosting them with the app would stop that.
 - The Archived filter on the Tasks page compares dates using UTC. It's minor, but it should use the local date like everything else.
 - The two or three early-look testers are still to be chosen.
+- The real database still has three accounts with no data that were each used once in July (two gmail.com addresses and caroline@growthpartnerpros.com, which never signed in). Decide whether to remove them before beta.
+- Previews and the live app look the same, which makes it easy to be in the wrong one. A "Test version" strip on previews would help.
+- On a phone, Settings isn't on the bottom bar. Part of the views and mobile pass.
+- The Tasks page shows an empty list when tasks fail to load, instead of saying something went wrong.
 - The test database has no Edge Functions (and no Anthropic key), so AI brain dump sorting and task breakdown don't work on previews.
-- Spoon numbers: task costs now follow the research (change 1). The daily budget formula and earn-back values are next (changes 2 and 3), then the wording (change 4).
+- Spoon numbers: task costs (change 1) and the daily budget (change 2) now follow the research. Earn-back values are next (change 3), then the wording (change 4). Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins.
+- The check-in state descriptions still contain em dashes. Part of change 4's wording pass.
 - The Repeats page can show "Nothing repeats yet" for a repeat created outside the app until the page is reloaded. Seen only in testing; repeats made in the app show right away.
 - Not built yet from the spoon rules in spec v3: the 2nd-override heads-up, "Talk it through" and the link to the last crash in the pause, phases changing Foundation, the hours meter, and the two check-in safety rules. "Make it smaller" for moved tasks waits for subtasks.
 - Task breakdown still creates its steps with both a date and a timeframe; subtasks (Phase 2) replace it.

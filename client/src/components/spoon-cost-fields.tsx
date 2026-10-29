@@ -5,6 +5,8 @@
 // which always wins. Its placeholder shows what the math says, and a line
 // underneath shows the math itself so the number never feels arbitrary.
 
+import { InfoTip } from "@/components/info-tip";
+import { EXPLAIN } from "@/lib/explainers";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -77,7 +79,12 @@ export function SpoonCostFields({
       </div>
 
       <div className="space-y-1.5">
-        <Label>Effort</Label>
+        <div className="flex items-center gap-1">
+          <Label>Effort</Label>
+          <InfoTip label="effort" testId={`${idPrefix}-info-effort`}>
+            <p>{EXPLAIN.effort}</p>
+          </InfoTip>
+        </div>
         <div className="flex gap-2" role="radiogroup" aria-label="Effort">
           {(["low", "medium", "high"] as Complexity[]).map((c) => (
             <button
@@ -117,6 +124,9 @@ export function SpoonCostFields({
           <Label htmlFor={`${idPrefix}-social`} className="cursor-pointer text-sm font-normal leading-snug">
             With people, on camera, or somewhere noisy or busy
           </Label>
+          <InfoTip label="with people or noise" testId={`${idPrefix}-info-social`}>
+            <p>{EXPLAIN.withPeople}</p>
+          </InfoTip>
         </div>
         <div className="flex items-start gap-3">
           <Checkbox
@@ -129,16 +139,26 @@ export function SpoonCostFields({
           <Label htmlFor={`${idPrefix}-dread`} className="cursor-pointer text-sm font-normal leading-snug">
             Something I'm dreading
           </Label>
+          <InfoTip label="dreading" testId={`${idPrefix}-info-dread`}>
+            <p>{EXPLAIN.dread}</p>
+          </InfoTip>
         </div>
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor={`${idPrefix}-spoons`}>
-          Spoons{" "}
-          <span className="text-xs italic text-muted-foreground">
-            {typed ? "your number" : "worked out for you, or type your own"}
-          </span>
-        </Label>
+        <div className="flex items-center gap-1">
+          <Label htmlFor={`${idPrefix}-spoons`}>
+            Spoons{" "}
+            <span className="text-xs italic text-muted-foreground">
+              {typed ? "your number" : "worked out for you, or type your own"}
+            </span>
+          </Label>
+          <InfoTip label="spoons" testId={`${idPrefix}-info-spoons`}>
+            <p>One spoon is about 30 minutes of ordinary, medium-effort activity.</p>
+            <p>{EXPLAIN.taskSpoons}</p>
+            <p className="text-muted-foreground">{EXPLAIN.estimateNote}</p>
+          </InfoTip>
+        </div>
         <Input
           id={`${idPrefix}-spoons`}
           type="number"

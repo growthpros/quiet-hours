@@ -46,8 +46,10 @@ import {
   type TaskRow,
   type DueBucket,
 } from "@/lib/tasks-data";
-import { getOrCreateTodayLedger, listRecentAllotments } from "@/lib/spoon-data";
-import { USUAL_WINDOW, spoonsOverIfAdded, usualBudget } from "@/lib/spoon-budget";
+import { getOrCreateTodayLedger } from "@/lib/spoon-data";
+import { getOrCreateProfile } from "@/lib/foundation-data";
+import { cleanUsual } from "@/lib/daily-budget";
+import { spoonsOverIfAdded } from "@/lib/spoon-budget";
 import { DEFAULT_EFFORT, spoonsOf, spoonsOfInput, taskSpoons } from "@/lib/spoon-cost";
 import { OverrideModal } from "@/components/override-modal";
 import { useToast } from "@/hooks/use-toast";
@@ -1044,15 +1046,15 @@ function NewTaskDialog() {
       // Check today's budget (see lib/spoon-budget.ts): spent so far,
       // including tasks finished today, plus today's plan plus this task,
       // against the check-in budget, or your usual before the check-in.
-      const [ledger, tasksNow, recent] = await Promise.all([
+      const [ledger, tasksNow, profile] = await Promise.all([
         getOrCreateTodayLedger(),
         listTasks(),
-        listRecentAllotments(USUAL_WINDOW),
+        getOrCreateProfile(),
       ]);
       const over = spoonsOverIfAdded(
         tasksNow,
         ledger,
-        usualBudget(recent),
+        cleanUsual(profile.usual_budget),
         localIsoDate(),
         spoonNum,
       );
