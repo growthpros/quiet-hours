@@ -225,7 +225,7 @@ function HistoricWave({ checkins, rangeDays, rangeLabel }: WaveProps) {
         <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
           <div>
             <p className="text-[11px] uppercase tracking-[0.14em] font-semibold" style={{ color: COLORS.inkSoft }}>
-              Burnout Wave, {rangeLabel.toLowerCase()}
+              Your Wave, {rangeLabel.toLowerCase()}
             </p>
             <p className="font-serif italic text-sm mt-1" style={{ color: COLORS.inkMute }}>
               Every point is {granLabel}. The line traces how you've moved.
@@ -440,7 +440,7 @@ function ToolkitUsage({ checkins, delegation, checklists, compassion, rangeDays,
   }
 
   const items = [
-    { label: "Burnout check-ins", data: seriesFor(checkins), accent: COLORS.sage, total: checkins.length },
+    { label: "Check-ins", data: seriesFor(checkins), accent: COLORS.sage, total: checkins.length },
     { label: "Delegation tasks", data: seriesFor(delegation), accent: COLORS.moss, total: delegation.length },
     { label: "Good Enough checklists", data: seriesFor(checklists), accent: COLORS.amber, total: checklists.length },
     { label: "Compassion entries", data: seriesFor(compassion), accent: COLORS.terracotta, total: compassion.length },

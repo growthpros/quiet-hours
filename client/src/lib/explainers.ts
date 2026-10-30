@@ -28,6 +28,12 @@ export const EXPLAIN = {
   bigDay:
     "A big day is one that went past 110% of its spoons. Overdoing it often shows up a day or two later, so the next day starts 10% lighter.",
 
+  // Phases and the Wave
+  phases:
+    "Your phase sets the defaults and prompts across the app. Pick the one that fits right now, and change it whenever you like. The app may suggest a lighter phase, or one with more room, from your check-ins. It never moves you into Burnout recovery; that one is yours to choose.",
+  wave:
+    "Each dot is one check-in, placed by how heavy it felt: your energy and how loud the world was. The line connects them through the day. It shows how your day moved, not a score.",
+
   // Earn-back
   earnBack:
     "Small things that give some energy back. Each one adds its spoons every time you log it, up to its times-a-day limit. There's no limit on the day's total. Rest brings you back toward where you started; it doesn't multiply a day.",

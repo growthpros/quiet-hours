@@ -307,7 +307,7 @@ function CompletionPopup({
                   {variance > 0
                     ? `${variance}h longer than estimated. Notice, don't grade.`
                     : variance < 0
-                    ? `${Math.abs(variance)}h shorter than estimated. Nice.`
+                    ? `${Math.abs(variance)}h shorter than estimated.`
                     : `Right on the estimate.`}
                 </p>
               )}

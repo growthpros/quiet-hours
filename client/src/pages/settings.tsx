@@ -91,7 +91,7 @@ export default function Settings() {
             className="font-serif text-base text-foreground"
             data-testid="text-email"
           >
-            {user?.email ?? "\u2014"}
+            {user?.email ?? "Not signed in"}
           </p>
           <Button
             variant="outline"
