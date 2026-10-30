@@ -430,6 +430,10 @@ export function SpoonMeter() {
       {showEarnPanel && (
         <EarnBackPanel
           actions={actions}
+          updateAvailable={(() => {
+            const u = updatedDefaults(actionsQ.data ?? []);
+            return u.changes.length + u.missing.length > 0;
+          })()}
           events={events}
           onClose={() => setShowEarnPanel(false)}
           onLog={(a) => log.mutate(a)}
@@ -493,7 +497,7 @@ import { useSpoonBudget } from "@/lib/use-spoon-budget";
 import { InfoTip } from "@/components/info-tip";
 import { EXPLAIN } from "@/lib/explainers";
 import { basisLine, loadDetail } from "@/lib/daily-budget";
-import { PATTERN_DAYS, PATTERN_WINDOW, showsPattern, type PatternDay } from "@/lib/earn-back";
+import { PATTERN_DAYS, PATTERN_WINDOW, showsPattern, updatedDefaults, type PatternDay } from "@/lib/earn-back";
 import { spentToday } from "@/lib/spoon-budget";
 import { addLocalDays } from "@/lib/local-date";
 
@@ -518,13 +522,15 @@ function dismissPattern(): void {
 
 interface EarnBackPanelProps {
   actions: EarnBackActionRow[];
+  /** True when the built-in items differ from the updated starting list. */
+  updateAvailable: boolean;
   events: EarnBackEventRow[];
   onClose: () => void;
   onLog: (a: EarnBackActionRow) => void;
   onUndo: (eventId: number) => void;
 }
 
-function EarnBackPanel({ actions, events, onClose, onLog, onUndo }: EarnBackPanelProps) {
+function EarnBackPanel({ actions, updateAvailable, events, onClose, onLog, onUndo }: EarnBackPanelProps) {
   // Build "count per action today"
   const countByAction = new Map<number, number>();
   for (const e of events) {
@@ -545,8 +551,16 @@ function EarnBackPanel({ actions, events, onClose, onLog, onUndo }: EarnBackPane
         <DialogHeader>
           <DialogTitle className="font-serif text-xl">Earn back</DialogTitle>
           <p className="font-serif italic text-sm" style={{ color: C.inkMute }}>
-            Small returns to your body. Per instance, not per duration.
+            Small things that give some energy back. Each counts every time you log it, up to its limit for the day.
           </p>
+          {updateAvailable && (
+            <p className="text-sm" style={{ color: C.inkSoft }} data-testid="earn-panel-update">
+              There's an updated starting list, based on research into what restores energy.{" "}
+              <Link href="/earn-back" onClick={onClose} className="underline underline-offset-2">
+                See what would change
+              </Link>
+            </p>
+          )}
         </DialogHeader>
 
         <div className="grid gap-2 sm:grid-cols-2 mt-4">

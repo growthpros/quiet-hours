@@ -400,6 +400,7 @@ What changed:
 - **Adding your own** now has plain labels with ⓘ ("Spoons back," "Times a day," "Minutes needed"), examples including stretching, step work and an audio track, and a check that stops blank or out-of-range numbers. Any item can be renamed by tapping its name.
 - **Pattern note:** when, on 3 days in the last 7, earn-back was at least a quarter of the day's spoons and the day carried more than an ordinary okay day, the spoon meter says so once: "On 3 days this week, earned-back spoons made room for more than an ordinary okay day. Worth noticing how those days felt." "Got it" puts it away for a week.
 - Plainer wording when an item has reached its limit for the day.
+- The earn-back panel on Today (the "More" button) points to the updated list when there is one ("See what would change"). Caroline found the old values there in testing and couldn't tell how to switch.
 
 **Decisions:**
 See the Decisions table.
