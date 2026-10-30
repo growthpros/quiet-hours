@@ -50,6 +50,9 @@ Checked: tests, test database run, preview, live check.
 | 2026-10-25 | The spoon numbers (daily budget formula, task costs, earn-back values) get researched before they're changed. | Caroline |
 | 2026-10-26 | Task spoons are worked out from time × effort (from the spoon research), and anyone can type their own number instead. | Caroline |
 | 2026-10-26 | When no effort is picked, a task counts as Medium. If the math comes out higher than expected, that's a nudge to pick the effort that fits. | Caroline |
+| 2026-10-29 | Earn-back starting list: a short walk outside and a nap of 10 minutes or more add 1 spoon; everything else adds half a spoon. Existing accounts switch over with a button. No limit on the day's total; each item keeps its own times-a-day limit. | Caroline |
+| 2026-10-29 | Anyone can add their own restorative or habit-building items (examples: stretching, step work, an audio track) and rename any item. | Caroline |
+| 2026-10-29 | A gentle note when, on 3 days in a week, earn-back was at least a quarter of the day's spoons and the day ran past an ordinary okay day. | Caroline |
 | 2026-10-29 | Keep using caroline@carolinehinton.com as the one account. Delete the old account from the original build, data and all; the old data isn't needed. | Caroline |
 | 2026-10-27 | Each day's spoons start from the person's "ordinary okay day" (8, 12, 16, 20 or 24 spoons, or their own number from 4 to 30; 12 until they choose), scaled by energy and reduced by other load, as in the spoon research. | Caroline |
 | 2026-10-27 | The ordinary-day question lives in Settings, with an invitation on the spoon meter until it's set. The onboarding version comes with change 4. | Caroline |
@@ -379,6 +382,40 @@ With Caroline's explicit OK, the old login was deleted on the real database. Eve
 **Checked:**
 Before deleting, the email was matched exactly and all 19 data tables were confirmed to delete with the login. Afterward, nothing was left for the old account, and Caroline's current account was unchanged.
 
+### 2026-10-29: Earn-back list and pattern note (spoon model, change 3)
+
+**What and why:**
+The starting earn-back values came from the original build. The research found them generous: together they allowed about 26 spoons back in a day, more than twice an ordinary day. Caroline chose to keep earn-back open-ended with no limit on the day's total, but to bring each item's value in line with the research and to notice when earn-back keeps making room for more work.
+
+What changed:
+
+- **Starting list for new accounts:**
+  - Short walk outside (was "Walked"): +1, from 10 minutes, twice a day
+  - Napped: +1, from 10 minutes, once a day
+  - Meditated: +0.5, from 10 minutes, twice a day
+  - Deep breathing: +0.5, from 3 minutes, twice a day
+  - Body-double session, Said no, Delegated, Removed a task, Under-scheduled: +0.5 each
+  - Protein snack and Hydration target: +0.5, unchanged
+- **Existing accounts** see an "updated starting list" card on the Earn-back page that lists exactly what would change. "Use the updated starting list" updates only the built-in items. The person's own items, and what they've switched on, off or starred, stay as they are.
+- **Adding your own** now has plain labels with ⓘ ("Spoons back," "Times a day," "Minutes needed"), examples including stretching, step work and an audio track, and a check that stops blank or out-of-range numbers. Any item can be renamed by tapping its name.
+- **Pattern note:** when, on 3 days in the last 7, earn-back was at least a quarter of the day's spoons and the day carried more than an ordinary okay day, the spoon meter says so once: "On 3 days this week, earned-back spoons made room for more than an ordinary okay day. Worth noticing how those days felt." "Got it" puts it away for a week.
+- Plainer wording when an item has reached its limit for the day.
+- The earn-back panel on Today (the "More" button) points to the updated list when there is one ("See what would change"). Caroline found the old values there in testing and couldn't tell how to switch.
+
+**Decisions:**
+See the Decisions table.
+
+**Database:**
+No change.
+
+**Checked:**
+156 tests, including the starting list, switching over (built-in items only, the person's own items untouched), adding your own, and the pattern rule (the third qualifying day shows it; under a quarter, or not past an ordinary day, doesn't count). In a real browser against the test database:
+
+- Three heavy earn-back days showed the note, and "Got it" kept it away after a reload.
+- The updated-list card listed each change. Switching updated the built-in items, kept "Said no" switched off and starred, left a custom "Stretching" at its own values, and the card went away.
+- Adding "Step work" with 0 spoons showed the check; with 1 spoon, twice a day, from 20 minutes, it saved. Renaming worked. A value of 9 on an existing item wasn't saved.
+- The page fit a phone screen with no sideways scrolling.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
@@ -397,7 +434,7 @@ Things noticed along the way that aren't scheduled yet:
 - On a phone, Settings isn't on the bottom bar. Part of the views and mobile pass.
 - The Tasks page shows an empty list when tasks fail to load, instead of saying something went wrong.
 - The test database has no Edge Functions (and no Anthropic key), so AI brain dump sorting and task breakdown don't work on previews.
-- Spoon numbers: task costs (change 1) and the daily budget (change 2) now follow the research. Earn-back values are next (change 3), then the wording (change 4). Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins.
+- Spoon numbers: task costs (change 1), the daily budget (change 2) and earn-back (change 3) now follow the research. The wording pass (change 4) is next. Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins.
 - The check-in state descriptions still contain em dashes. Part of change 4's wording pass.
 - The Repeats page can show "Nothing repeats yet" for a repeat created outside the app until the page is reloaded. Seen only in testing; repeats made in the app show right away.
 - Not built yet from the spoon rules in spec v3: the 2nd-override heads-up, "Talk it through" and the link to the last crash in the pause, phases changing Foundation, the hours meter, and the two check-in safety rules. "Make it smaller" for moved tasks waits for subtasks.

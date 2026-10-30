@@ -28,6 +28,17 @@ export const EXPLAIN = {
   bigDay:
     "A big day is one that went past 110% of its spoons. Overdoing it often shows up a day or two later, so the next day starts 10% lighter.",
 
+  // Earn-back
+  earnBack:
+    "Small things that give some energy back. Each one adds its spoons every time you log it, up to its times-a-day limit. There's no limit on the day's total. Rest brings you back toward where you started; it doesn't multiply a day.",
+  spoonsBack: "How many spoons this adds each time you log it, from 0.5 to 5.",
+  timesADay:
+    "How many times a day it adds spoons. After that it's still logged, with no spoons added, because the fifth nap doesn't restore what the first one did.",
+  minutesNeeded:
+    "Leave this blank for anything that counts when it happens, like saying no. For things that need some time to help, like a nap, set the fewest minutes that count.",
+  updatedList:
+    "The starting list was updated from research into what restores energy. Short walks outside and naps of 10 minutes or more add 1 spoon. Most other items add half a spoon.",
+
   // Task form
   effort:
     "How hard the task is on your mind and body. Low is 1 spoon an hour, Medium 2 and High 3. Something new or unfamiliar usually goes up a level.",

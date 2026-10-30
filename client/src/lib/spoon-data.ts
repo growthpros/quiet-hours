@@ -9,6 +9,7 @@ import { addLocalDays, localIsoDate } from "@/lib/local-date";
 import { cleanUsual, dailyBudget, nextAllotment, wasBigDay, type BudgetBasis } from "@/lib/daily-budget";
 import { spentToday, todayBudget } from "@/lib/spoon-budget";
 import { listTasks } from "@/lib/tasks-data";
+import { updatedDefaults } from "@/lib/earn-back";
 
 // ---------- Types ----------
 export interface SpoonLedgerRow {
@@ -298,6 +299,56 @@ export async function createEarnBackAction(input: {
     .single();
   if (error) throw error;
   return data as EarnBackActionRow;
+}
+
+// Switch built-in actions to the updated starting list (spoon model change 3).
+// Only built-in actions change; the person's own items, and which actions
+// are on, off or starred, stay as they are. Returns how many changed.
+export async function applyUpdatedEarnBackDefaults(): Promise<number> {
+  const user_id = await requireUserId();
+  const actions = await listEarnBackActions();
+  const { changes, missing } = updatedDefaults(actions);
+  for (const c of changes) {
+    await updateEarnBackAction(c.id, {
+      label: c.label,
+      spoonValue: c.spoonValue,
+      dailyCap: c.dailyCap,
+      durationMinMinutes: c.durationMinMinutes,
+    });
+  }
+  if (missing.length > 0) {
+    const now = Date.now();
+    const { error } = await supabase.from("earn_back_actions").insert(
+      missing.map((a) => ({
+        user_id,
+        action_key: a.actionKey,
+        label: a.label,
+        icon: a.icon,
+        spoon_value: a.spoonValue,
+        daily_cap: a.dailyCap,
+        duration_min_minutes: a.durationMinMinutes,
+        linked_pillar_key: a.linkedPillarKey,
+        featured: false,
+        enabled: true,
+        sort_order: a.sortOrder,
+        created_at: now,
+      })),
+    );
+    if (error) throw error;
+  }
+  return changes.length + missing.length;
+}
+
+// The last few days of spoons, for the earn-back pattern notice.
+export async function listLedgerRange(fromIso: string, toIso: string): Promise<SpoonLedgerRow[]> {
+  const { data, error } = await supabase
+    .from("spoon_ledger")
+    .select("*")
+    .gte("log_date", fromIso)
+    .lte("log_date", toIso)
+    .order("log_date", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as SpoonLedgerRow[];
 }
 
 export async function deleteEarnBackAction(id: number): Promise<void> {

@@ -20,6 +20,7 @@ import {
   listEarnBackActions,
   listTodayEarnBackEvents,
   listEarnBackEventsForDate,
+  listLedgerRange,
   logEarnBack,
   seedDefaultEarnBackIfNeeded,
   undoEarnBack,
@@ -87,6 +88,15 @@ export function SpoonMeter() {
     enabled: isToday,
   });
 
+  // The last week of spoons, for the earn-back pattern notice (lib/earn-back.ts).
+  const weekStart = localIsoDate(addLocalDays(new Date(), -(PATTERN_WINDOW - 1)));
+  const weekQ = useQuery<SpoonLedgerRow[]>({
+    queryKey: ["/api/spoon/ledger", "week", weekStart],
+    queryFn: () => listLedgerRange(weekStart, localIsoDate()),
+    enabled: isToday,
+  });
+  const [patternHidden, setPatternHidden] = useState(() => patternDismissed());
+
   const log = useMutation({
     mutationFn: async (action: EarnBackActionRow) => {
       if (!isToday) throw new Error("Past days are read-only.");
@@ -101,7 +111,7 @@ export function SpoonMeter() {
       if (result.event.at_cap) {
         toast({
           title: `${action.label}, logged.`,
-          description: `At cap for today (${action.daily_cap}/day). No spoons added, still counted.`,
+          description: `That's its limit for today (${action.daily_cap} a day). Logged, with no spoons added.`,
         });
       } else {
         toast({
@@ -165,6 +175,18 @@ export function SpoonMeter() {
   const remaining = Math.max(0, total - spent - committed);
 
   const noAllotment = !ledger || Number(ledger.allotted) === 0;
+
+  const todayIso = localIsoDate();
+  const patternDaysList: PatternDay[] = (weekQ.data ?? []).map((l) => ({
+    iso: l.log_date,
+    allotted: Number(l.allotted),
+    earnedBack: Number(l.earned_back),
+    load:
+      spentToday(tasksQ.data ?? [], Number(l.spent || 0), l.log_date) +
+      (l.log_date === todayIso ? committedSpoonsToday(tasksQ.data ?? [], todayIso) : 0),
+  }));
+  const showPatternNote =
+    isToday && !patternHidden && tasksQ.isSuccess && showsPattern(patternDaysList, usual);
   // What went into the budget, for days set after migration 016.
   const basis = !noAllotment && ledger?.budget_basis ? ledger.budget_basis : null;
 
@@ -325,6 +347,29 @@ export function SpoonMeter() {
           )}
         </div>
 
+        {showPatternNote && (
+          <div
+            className="flex flex-wrap items-start justify-between gap-2 px-6 py-3 border-t text-sm"
+            style={{ borderColor: C.line, background: C.amberSoft, color: C.inkSoft }}
+            data-testid="earn-back-pattern"
+          >
+            <p className="flex-1 min-w-[14rem] font-serif italic">
+              On {PATTERN_DAYS} days this week, earned-back spoons made room for more than an ordinary okay day. Worth noticing how those days felt.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                dismissPattern();
+                setPatternHidden(true);
+              }}
+              data-testid="button-pattern-got-it"
+            >
+              Got it
+            </Button>
+          </div>
+        )}
+
         {/* Earn-back chip cluster */}
         {actionsQ.isLoading ? (
           <div className="px-6 py-4 border-t" style={{ borderColor: C.line }}>
@@ -385,6 +430,10 @@ export function SpoonMeter() {
       {showEarnPanel && (
         <EarnBackPanel
           actions={actions}
+          updateAvailable={(() => {
+            const u = updatedDefaults(actionsQ.data ?? []);
+            return u.changes.length + u.missing.length > 0;
+          })()}
           events={events}
           onClose={() => setShowEarnPanel(false)}
           onLog={(a) => log.mutate(a)}
@@ -448,16 +497,40 @@ import { useSpoonBudget } from "@/lib/use-spoon-budget";
 import { InfoTip } from "@/components/info-tip";
 import { EXPLAIN } from "@/lib/explainers";
 import { basisLine, loadDetail } from "@/lib/daily-budget";
+import { PATTERN_DAYS, PATTERN_WINDOW, showsPattern, updatedDefaults, type PatternDay } from "@/lib/earn-back";
+import { spentToday } from "@/lib/spoon-budget";
+import { addLocalDays } from "@/lib/local-date";
+
+// The pattern note can be put away for a week. This is a per-browser
+// convenience, so a blocked or empty storage just means it shows again.
+const PATTERN_KEY = "qh-earn-back-pattern-hidden-until";
+function patternDismissed(): boolean {
+  try {
+    return Number(window.localStorage.getItem(PATTERN_KEY) ?? 0) > Date.now();
+  } catch (e) {
+    console.warn("Couldn't read the pattern note setting", e);
+    return false;
+  }
+}
+function dismissPattern(): void {
+  try {
+    window.localStorage.setItem(PATTERN_KEY, String(Date.now() + 7 * 24 * 60 * 60 * 1000));
+  } catch (e) {
+    console.warn("Couldn't save the pattern note setting", e);
+  }
+}
 
 interface EarnBackPanelProps {
   actions: EarnBackActionRow[];
+  /** True when the built-in items differ from the updated starting list. */
+  updateAvailable: boolean;
   events: EarnBackEventRow[];
   onClose: () => void;
   onLog: (a: EarnBackActionRow) => void;
   onUndo: (eventId: number) => void;
 }
 
-function EarnBackPanel({ actions, events, onClose, onLog, onUndo }: EarnBackPanelProps) {
+function EarnBackPanel({ actions, updateAvailable, events, onClose, onLog, onUndo }: EarnBackPanelProps) {
   // Build "count per action today"
   const countByAction = new Map<number, number>();
   for (const e of events) {
@@ -478,8 +551,16 @@ function EarnBackPanel({ actions, events, onClose, onLog, onUndo }: EarnBackPane
         <DialogHeader>
           <DialogTitle className="font-serif text-xl">Earn back</DialogTitle>
           <p className="font-serif italic text-sm" style={{ color: C.inkMute }}>
-            Small returns to your body. Per instance, not per duration.
+            Small things that give some energy back. Each counts every time you log it, up to its limit for the day.
           </p>
+          {updateAvailable && (
+            <p className="text-sm" style={{ color: C.inkSoft }} data-testid="earn-panel-update">
+              There's an updated starting list, based on research into what restores energy.{" "}
+              <Link href="/earn-back" onClick={onClose} className="underline underline-offset-2">
+                See what would change
+              </Link>
+            </p>
+          )}
         </DialogHeader>
 
         <div className="grid gap-2 sm:grid-cols-2 mt-4">
@@ -563,7 +644,7 @@ function EarnBackPanel({ actions, events, onClose, onLog, onUndo }: EarnBackPane
                     <span className="flex items-center gap-3">
                       {e.at_cap ? (
                         <span className="text-xs italic" style={{ color: C.inkMute }}>
-                          logged, at cap
+                          logged, past today's limit
                         </span>
                       ) : (
                         <span
