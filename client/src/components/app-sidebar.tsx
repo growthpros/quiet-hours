@@ -38,7 +38,7 @@ export const NAV_ITEMS = [
   { title: "Good Enough", url: "/good-enough", icon: ListChecks },
   { title: "Reframes", url: "/reframes", icon: Quote },
   { title: "Compassion", url: "/compassion", icon: HeartHandshake },
-  { title: "Burnout", url: "/burnout", icon: Waves },
+  { title: "Check-in", url: "/burnout", icon: Waves },
   { title: "History", url: "/history", icon: HistoryIcon },
 ] as const;
 

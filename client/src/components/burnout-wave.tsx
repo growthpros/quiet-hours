@@ -3,6 +3,8 @@
 // so far today, positioned by time on the x-axis and by state intensity on
 // the y-axis. Includes a warm regulation message tuned to today's pattern.
 
+import { EXPLAIN } from "@/lib/explainers";
+import { InfoTip } from "@/components/info-tip";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card } from "@/components/ui/card";
@@ -159,7 +161,10 @@ export function BurnoutWave() {
               style={{ color: COLORS.inkSoft }}
             >
               <Waves className="h-3.5 w-3.5" strokeWidth={2} />
-              {isToday ? "Today's Burnout Wave" : `Burnout Wave, ${humanLabel(date).toLowerCase()}`}
+              {isToday ? "Your Wave" : `Your Wave, ${humanLabel(date).toLowerCase()}`}
+              <InfoTip label="your wave" testId="info-wave">
+                <p>{EXPLAIN.wave}</p>
+              </InfoTip>
             </p>
             <p
               className="font-serif italic text-sm mt-1"

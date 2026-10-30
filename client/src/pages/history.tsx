@@ -178,7 +178,7 @@ export default function History() {
     <div className="space-y-10">
       <PageHeader
         title="History"
-        subtitle="A place to look back — not to grade yourself. Notice what shows up, and let the patterns be information, not verdicts."
+        subtitle="A place to look back, not to grade yourself. Notice what shows up, and let the patterns be information, not verdicts."
       />
 
       {/* Range filter */}
@@ -354,7 +354,7 @@ function ReflectionMirror({
           What showed up
         </h2>
         <p className="font-serif text-sm italic text-muted-foreground">
-          Not a scorecard — just what your check-ins have been noticing.
+          Not a scorecard. Just what your check-ins have been noticing.
         </p>
       </div>
 
@@ -362,18 +362,18 @@ function ReflectionMirror({
       <div className="grid gap-3 md:grid-cols-2">
         <OverviewCard
           icon={Waves}
-          eyebrow="Burnout check-ins"
+          eyebrow="Check-ins"
           headline={
             burnout.length === 0
               ? "None logged."
               : nonGrounded === 0
-                ? `${burnout.length} check-in${burnout.length === 1 ? "" : "s"} — all grounded.`
+                ? `${burnout.length} check-in${burnout.length === 1 ? "" : "s"}, all grounded.`
                 : `${nonGrounded} of ${totalStates} caught you in a pulled-in state.`
           }
           body={
             burnout.length === 0
               ? "When you pause for five minutes, it lands here."
-              : "Not a verdict — the noticing itself is the practice."
+              : "Not a verdict. The noticing itself is the practice."
           }
         />
         <OverviewCard
@@ -383,7 +383,7 @@ function ReflectionMirror({
             delegation.length === 0
               ? "Nothing logged."
               : delegateQuadrant.length === 0
-                ? `${delegation.length} task${delegation.length === 1 ? "" : "s"} — none needed handing off.`
+                ? `${delegation.length} task${delegation.length === 1 ? "" : "s"}, and none needed handing off.`
                 : `${released} of ${delegateQuadrant.length} handed off with control released.`
           }
           body={
@@ -650,7 +650,7 @@ function BrowsableHistory({
 
   const filters: { key: FeedFilter; label: string }[] = [
     { key: "all", label: "All" },
-    { key: "burnout", label: "Burnout" },
+    { key: "burnout", label: "Check-ins" },
     { key: "delegation", label: "Delegation" },
     { key: "checklists", label: "Checklists" },
     { key: "compassion", label: "Compassion" },
@@ -721,7 +721,7 @@ function BurnoutItem({ c }: { c: BurnoutRow }) {
           <div className="flex items-center gap-2">
             <Waves className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
             <span className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-              {formatTime(c.createdAt)} · Burnout
+              {formatTime(c.createdAt)} · Check-in
             </span>
           </div>
           <span className="font-serif text-sm font-medium text-foreground">

@@ -150,7 +150,7 @@ function NewEntryDialog() {
               id="c-outcome"
               value={outcome}
               onChange={(e) => setOutcome(e.target.value)}
-              placeholder="Optional — how it actually turned out."
+              placeholder="Optional: how it actually turned out."
               data-testid="input-outcome"
             />
           </div>
@@ -206,7 +206,7 @@ export default function Compassion() {
 
   const stats = useMemo(() => {
     if (entries.length === 0)
-      return { count: 0, avgDrop: "—", pctReduced: "—" };
+      return { count: 0, avgDrop: "None yet", pctReduced: "None yet" };
     const drops = entries.map((e) => e.intensityBefore - e.intensityAfter);
     const avgDrop = drops.reduce((a, b) => a + b, 0) / drops.length;
     const reduced = entries.filter(
@@ -231,7 +231,7 @@ export default function Compassion() {
     <div className="space-y-8">
       <PageHeader
         title="Compassion"
-        subtitle="A log for the moments that hit hard — and the kinder line you found afterward."
+        subtitle="A log for the moments that hit hard, and the kinder line you found afterward."
       >
         <NewEntryDialog />
       </PageHeader>

@@ -3,6 +3,9 @@
 // Tap a pillar to log or adjust its value. Tap "Add pillar" to create a
 // custom pillar. Full editing lives on the Foundation Settings page.
 
+import { phaseDesc, phaseLabel } from "@/lib/phases";
+import { InfoTip } from "@/components/info-tip";
+import { EXPLAIN } from "@/lib/explainers";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "wouter";
@@ -32,14 +35,6 @@ import {
   type EarnBackActionRow,
 } from "@/lib/spoon-data";
 
-// Phase labels shown on the badge
-const PHASE_LABELS: Record<string, string> = {
-  acute_recovery: "Acute recovery",
-  rebuilding: "Rebuilding",
-  steady: "Steady",
-  stretch: "Stretch",
-  burnout: "Burnout",
-};
 
 function displayLabel(p: FoundationPillarRow): string {
   if (p.custom_label && p.custom_label.length > 0) return p.custom_label;
@@ -197,7 +192,7 @@ function LogModal({ pillar, currentLog, open, onClose }: LogModalProps) {
       })();
       if (met) {
         toast({
-          title: `Nice, ${displayLabel(pillar).toLowerCase()} for today.`,
+          title: `${displayLabel(pillar)}, logged for today.`,
           description: "Small things, compounding.",
         });
       }
@@ -377,9 +372,8 @@ export function FoundationCard() {
   const logsByPillar = new Map<number, DailyFoundationLogRow>();
   for (const l of logsQ.data ?? []) logsByPillar.set(l.pillar_id, l);
 
-  const phaseLabel = profileQ.data?.current_phase
-    ? PHASE_LABELS[profileQ.data.current_phase]
-    : "Set your phase";
+  const currentPhase = profileQ.data?.current_phase ?? null;
+  const badgeLabel = phaseLabel(currentPhase) ?? "Set your phase";
 
   const isLoading = profileQ.isLoading || pillarsQ.isLoading || logsQ.isLoading;
 
@@ -403,7 +397,7 @@ export function FoundationCard() {
           }}
         />
         <div className="relative p-6">
-          <div className="flex items-baseline justify-between mb-4">
+          <div className="flex items-baseline justify-between gap-1 mb-4">
             <div>
               <p className="font-serif text-lg font-medium text-[#2A2620]">
                 {isToday ? "Bottom of the Pyramid" : `Foundation, ${humanLabel(date).toLowerCase()}`}
@@ -423,9 +417,17 @@ export function FoundationCard() {
                 }}
                 data-testid="badge-phase"
               >
-                {phaseLabel}
+                {badgeLabel}
               </span>
             </Link>
+            {currentPhase && (
+              <InfoTip label="this phase" testId="info-phase-badge">
+                <p>
+                  <strong>{badgeLabel}.</strong> {phaseDesc(currentPhase)}
+                </p>
+                <p className="text-muted-foreground">{EXPLAIN.phases}</p>
+              </InfoTip>
+            )}
           </div>
 
           {isLoading ? (

@@ -268,7 +268,7 @@ function TaskCard({ task }: { task: DelegationTask }) {
         {quadrant === "drop" && (
           <div className="flex items-center justify-between gap-2 rounded-md bg-accent/40 p-3">
             <p className="font-serif text-sm italic text-accent-foreground">
-              This might not need doing at all — delete it now?
+              This might not need doing at all. Delete it now?
             </p>
             <Button
               variant="ghost"

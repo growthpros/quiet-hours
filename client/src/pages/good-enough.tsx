@@ -269,7 +269,7 @@ function RunDetail({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/checklists"] });
-      toast({ title: `${run.templateLabel} — shipped. The bar is set.` });
+      toast({ title: `${run.templateLabel}: shipped. The bar is set.` });
       onBack();
     },
   });
@@ -325,7 +325,7 @@ function RunDetail({
           {run.templateLabel}
         </h2>
         <p className="font-serif text-sm italic text-muted-foreground">
-          Check what's true. When the must-haves are done, it's done — even
+          Check what's true. When the must-haves are done, it's done, even
           if the critic disagrees.
         </p>
       </div>
@@ -375,7 +375,7 @@ function RunDetail({
               </p>
               <p className="font-serif text-sm italic text-muted-foreground">
                 “It's not really done. One more pass and it'll be right.”
-                &nbsp;— the urge to keep going is not the same as the work
+                The urge to keep going is not the same as the work
                 needing more. You set the bar. Cross it.
               </p>
             </div>
@@ -535,7 +535,7 @@ export default function GoodEnough() {
     <div className="space-y-8">
       <PageHeader
         title="Good Enough"
-        subtitle="For when the inner critic shows up mid-task. Decide what 'done' looks like before you start, then stop when you get there — even if the voice inside says one more pass."
+        subtitle="For when the inner critic shows up mid-task. Decide what 'done' looks like before you start, then stop when you get there, even if the voice inside says one more pass."
       />
       <div className="space-y-4">
         <h2 className="font-serif text-lg font-semibold text-foreground">

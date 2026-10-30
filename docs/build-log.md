@@ -53,6 +53,10 @@ Checked: tests, test database run, preview, live check.
 | 2026-10-29 | Earn-back starting list: a short walk outside and a nap of 10 minutes or more add 1 spoon; everything else adds half a spoon. Existing accounts switch over with a button. No limit on the day's total; each item keeps its own times-a-day limit. | Caroline |
 | 2026-10-29 | Anyone can add their own restorative or habit-building items (examples: stretching, step work, an audio track) and rename any item. | Caroline |
 | 2026-10-29 | A gentle note when, on 3 days in a week, earn-back was at least a quarter of the day's spoons and the day ran past an ordinary okay day. | Caroline |
+| 2026-10-29 | Quiet Hours is aimed at neurodivergent people and uses their own language, "burnout" included. (The general-audience HumanFit configuration from the deep-research project is the one that avoids clinical terms. The neurodivergent tools in the humanfit folder of the Tools project are a separate thing.) | Caroline |
+| 2026-10-29 | Names: "Check-in" in the menu and page title, with "A five-minute burnout check-in" under it. "Your Wave" on Today and History. Phases, heaviest first: Burnout recovery, Reduced capacity, Building back, Steady, Stretch, each with an ⓘ. | Caroline |
+| 2026-10-29 | The app suggests lighter phases only down to Reduced capacity. Only the person moves themselves into Burnout recovery. | Caroline |
+| 2026-10-29 | Onboarding adds two skippable steps after the welcome: the ordinary okay day and the current phase. The welcome's outdated lines ("not a productivity app," "no notifications") are rewritten. | Caroline |
 | 2026-10-29 | Keep using caroline@carolinehinton.com as the one account. Delete the old account from the original build, data and all; the old data isn't needed. | Caroline |
 | 2026-10-27 | Each day's spoons start from the person's "ordinary okay day" (8, 12, 16, 20 or 24 spoons, or their own number from 4 to 30; 12 until they choose), scaled by energy and reduced by other load, as in the spoon research. | Caroline |
 | 2026-10-27 | The ordinary-day question lives in Settings, with an invitation on the spoon meter until it's set. The onboarding version comes with change 4. | Caroline |
@@ -416,11 +420,52 @@ No change.
 - Adding "Step work" with 0 spoons showed the check; with 1 spoon, twice a day, from 20 minutes, it saved. Renaming worked. A value of 9 on an existing item wasn't saved.
 - The page fit a phone screen with no sideways scrolling.
 
+### 2026-10-29: Wording pass (spoon model, change 4)
+
+**What and why:**
+Last of the four spoon model changes: names that fit the people the app is for, explanations behind the labels, and the app's own voice rules applied everywhere.
+
+What changed:
+
+- **Check-in.** The menu and page say "Check-in" (it fits the phone's bottom bar), with "How are you right now? A five-minute burnout check-in." under the title. The address stays /burnout, so old links work.
+- **Your Wave** replaces "Burnout Wave" on Today and History, with an ⓘ explaining what the dots and line show. History's chart and filter say "Check-ins."
+- **Phases**, heaviest first, with the same saved keys so nobody's phase changes:
+  - Burnout recovery (was Burnout)
+  - Reduced capacity (was Acute recovery)
+  - Building back (was Rebuilding)
+  - Steady
+  - Stretch
+
+  Each has a plain description, shown on the Foundation page, in onboarding, in an ⓘ on the Today badge, and in suggestions.
+- **Phase suggestions** (now in `lib/phases.ts`, with tests):
+  - They step down only as far as Reduced capacity, and then mention that Burnout recovery is there if it fits.
+  - They no longer move anyone into it.
+  - Fixed: from the heaviest phase, a calm week used to suggest jumping straight to Steady. It now suggests one step at a time.
+- **Onboarding.** The welcome's two outdated lines are rewritten. It now describes a gentle planner and toolkit, and says reminders only come when you ask for them. Two skippable steps follow: the ordinary okay day, then "Where are you right now?" with the five phases. Each saves as soon as it's picked.
+- **Voice.**
+  - All 46 em dashes in the app's own words are gone, each rewritten to fit its sentence. Dash placeholders became words like "Not set" and "None yet."
+  - A new guard test (`no-em-dashes.test.ts`) fails if an em dash comes back.
+  - The three "Nice." lines no longer grade: "Meditation, logged for today."
+
+**Decisions:**
+See the Decisions table.
+
+**Database:**
+No change.
+
+**Checked:**
+163 tests, including the phase names and the suggestion rules (never into Burnout recovery; one step at a time), and the em dash guard. In a real browser against the test database:
+
+- As a brand-new account, the welcome showed the new text. Choosing 16 spoons and Building back saved both, and the Today badge and its ⓘ showed Building back.
+- Today shows "Your Wave," and the menu and the page say "Check-in."
+- Five heavy check-ins suggested Reduced capacity, with the Burnout recovery line. In Reduced capacity, nothing was suggested.
+- The Foundation page lists the five phases in order.
+- The phone's bottom bar shows "Check-in" with no sideways scrolling.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
 
-- Em dashes in the app's own words, including the Today compassion card and the check-in state descriptions. Part of the voice pass in "Ready for testers."
 - On a phone, the bottom bar has 11 buttons and wraps onto two rows, and empty past days take a full card. Part of the views and mobile pass.
 - Leftover template code (`server/`, `shared/`, Express, SQLite, Passport) still to remove.
 - The test database still sends sign-in email through Supabase's built-in service (2 an hour). Connecting it to Resend would fix that.
@@ -434,8 +479,7 @@ Things noticed along the way that aren't scheduled yet:
 - On a phone, Settings isn't on the bottom bar. Part of the views and mobile pass.
 - The Tasks page shows an empty list when tasks fail to load, instead of saying something went wrong.
 - The test database has no Edge Functions (and no Anthropic key), so AI brain dump sorting and task breakdown don't work on previews.
-- Spoon numbers: task costs (change 1), the daily budget (change 2) and earn-back (change 3) now follow the research. The wording pass (change 4) is next. Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins.
-- The check-in state descriptions still contain em dashes. Part of change 4's wording pass.
+- The spoon model is done (changes 1 to 4). Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins. Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins.
 - The Repeats page can show "Nothing repeats yet" for a repeat created outside the app until the page is reloaded. Seen only in testing; repeats made in the app show right away.
 - Not built yet from the spoon rules in spec v3: the 2nd-override heads-up, "Talk it through" and the link to the last crash in the pause, phases changing Foundation, the hours meter, and the two check-in safety rules. "Make it smaller" for moved tasks waits for subtasks.
 - Task breakdown still creates its steps with both a date and a timeframe; subtasks (Phase 2) replace it.

@@ -69,11 +69,11 @@ const SENSORY_SCALE = [
 // so summaries speak in words rather than numbers.
 function energyLabel(avg: number): string {
   const v = Math.round(avg);
-  return ENERGY_SCALE.find((s) => s.v === v)?.label ?? "—";
+  return ENERGY_SCALE.find((s) => s.v === v)?.label ?? "Not set";
 }
 function sensoryLabel(avg: number): string {
   const v = Math.round(avg);
-  return SENSORY_SCALE.find((s) => s.v === v)?.label ?? "—";
+  return SENSORY_SCALE.find((s) => s.v === v)?.label ?? "Not set";
 }
 
 // ---------- Compulsive-state options ----------
@@ -95,7 +95,7 @@ const STATE_OPTIONS: StateOption[] = [
     id: "drifting",
     label: "Drifting",
     blurb:
-      "I got pulled into something without deciding to \u2014 the phone, the news, a side project, a rabbit hole.",
+      "I got pulled into something without deciding to: the phone, the news, a side project, a rabbit hole.",
     ground:
       "Name the pull. Close one tab. Choose the next 20 minutes on purpose, however small.",
   },
@@ -111,7 +111,7 @@ const STATE_OPTIONS: StateOption[] = [
     id: "numbing",
     label: "Numbing",
     blurb:
-      "I'm using input \u2014 scrolling, reading, building, checking \u2014 to not feel something underneath.",
+      "I'm using input, like scrolling, reading, building or checking, to not feel something underneath.",
     ground:
       "You don't have to fix the feeling. Put both feet on the floor, breathe out longer than in, and let it be there for a minute.",
   },
@@ -121,13 +121,13 @@ const STATE_OPTIONS: StateOption[] = [
     blurb:
       "I know what I should be doing and I can't start.",
     ground:
-      "Shrink the task. What is the tiniest startable piece \u2014 opening a doc, writing one sentence, standing up? Do that.",
+      "Shrink the task. What is the tiniest startable piece? Opening a doc, writing one sentence, standing up. Do that.",
   },
 ];
 
 
 function stateLabel(id: string | null | undefined): string {
-  if (!id) return "—";
+  if (!id) return "Not set";
   return STATE_OPTIONS.find((s) => s.id === id)?.label ?? id;
 }
 
@@ -381,7 +381,7 @@ function CheckinCard() {
                 </InfoTip>
               </h2>
               <p className="font-serif text-sm italic text-muted-foreground">
-                Sound, light, texture, screens, other people — how much is
+                Sound, light, texture, screens, other people. How much is
                 landing on you right now?
               </p>
             </div>
@@ -404,7 +404,7 @@ function CheckinCard() {
                 </InfoTip>
               </h2>
               <p className="font-serif text-sm italic text-muted-foreground">
-                Not how bad or good — what kind. This one matters most.
+                Not how bad or good, but what kind. This one matters most.
               </p>
             </div>
             <div className="space-y-2">
@@ -560,7 +560,7 @@ function CheckinCard() {
                 <dd className="text-right text-foreground">
                   {symptoms.length
                     ? symptoms.map((s) => symptomLabel(s)).join(", ")
-                    : "—"}
+                    : "Nothing noted"}
                 </dd>
               </div>
               {note.trim() && (
@@ -877,12 +877,12 @@ function SummaryColumn() {
               <p className="font-serif text-sm italic text-muted-foreground">
                 {nonGroundedCount} of {totalWithState}{" "}
                 {totalWithState === 1 ? "check-in" : "check-ins"} today caught
-                you in a pulled-in state — not grounded. Noticing that is the
+                you in a pulled-in state rather than grounded. Noticing that is the
                 practice.
               </p>
             ) : (
               <p className="font-serif text-sm italic text-muted-foreground">
-                Every check-in today was grounded. Nice.
+                Every check-in today was grounded.
               </p>
             )}
             <div className="space-y-2">
@@ -1039,8 +1039,8 @@ export default function Burnout() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Burnout"
-        subtitle="A five-minute pause — not a score to optimize. Notice where you are, then let it be that."
+        title="Check-in"
+        subtitle="How are you right now? A five-minute burnout check-in. Notice where you are, then let it be that."
       />
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-3">

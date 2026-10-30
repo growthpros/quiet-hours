@@ -18,21 +18,21 @@ export function bandFor(intensity: number): Band {
       key: "restored",
       label: "Restored",
       interpretation:
-        "Energy is holding and the world isn't asking too much. A good moment to protect — no need to add anything.",
+        "Energy is holding and the world isn't asking too much. A good moment to protect. No need to add anything.",
     };
   if (intensity < 3)
     return {
       key: "steady",
       label: "Steady",
       interpretation:
-        "You're in a workable middle. Small pacing choices — a short pause, dimmer light, a slower pace — go a long way here.",
+        "You're in a workable middle. Small pacing choices, like a short pause, dimmer light or a slower pace, go a long way here.",
     };
   if (intensity < 4)
     return {
       key: "stretched",
       label: "Stretched",
       interpretation:
-        "The day is asking a lot. Consider trimming the next hour — postpone the non-essential, and if you can, do the next thing 20% slower.",
+        "The day is asking a lot. Consider trimming the next hour: postpone the non-essential, and if you can, do the next thing 20% slower.",
     };
   return {
     key: "overloaded",

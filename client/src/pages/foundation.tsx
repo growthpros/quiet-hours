@@ -4,6 +4,9 @@
 // Deeper phase-driven behavior and add-your-own-earn-back-actions come in
 // Session 2.
 
+import { PHASES } from "@/lib/phases";
+import { InfoTip } from "@/components/info-tip";
+import { EXPLAIN } from "@/lib/explainers";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "wouter";
@@ -28,13 +31,7 @@ import {
   type UserProfileRow,
 } from "@/lib/foundation-data";
 
-const PHASE_OPTIONS = [
-  { key: "acute_recovery", label: "Acute recovery", desc: "The immediate now. Meds, hydration, protein, rest." },
-  { key: "rebuilding", label: "Rebuilding", desc: "Adding gentle movement, longer walks, sleep window." },
-  { key: "steady", label: "Steady", desc: "Full foundation, work rhythm, boundaries." },
-  { key: "stretch", label: "Stretch", desc: "Higher activity, training goals, longer focus blocks." },
-  { key: "burnout", label: "Burnout", desc: "Backing off. Foundation only. Nothing extra." },
-];
+const PHASE_OPTIONS = PHASES;
 
 function displayLabel(p: FoundationPillarRow): string {
   if (p.custom_label && p.custom_label.length > 0) return p.custom_label;
@@ -144,7 +141,12 @@ export default function Foundation() {
 
       {/* Current phase */}
       <section className="space-y-3">
-        <h2 className="font-serif text-lg font-medium">Current phase</h2>
+        <h2 className="flex items-center gap-1.5 font-serif text-lg font-medium">
+          Current phase
+          <InfoTip label="phases" testId="info-phases">
+            <p>{EXPLAIN.phases}</p>
+          </InfoTip>
+        </h2>
         <p className="text-sm text-muted-foreground">
           Sets defaults and prompts across the app. You can change this anytime.
         </p>

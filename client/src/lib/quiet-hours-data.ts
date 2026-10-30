@@ -30,7 +30,7 @@ export const REFRAMES: Reframe[] = [
     category: "over-responsibility",
     trigger: "A colleague asks you to take on extra work.",
     innerCritic:
-      "If you say no, they'll think you're not a team player — and if it goes wrong later, that's on you for not helping.",
+      "If you say no, they'll think you're not a team player. And if it goes wrong later, that's on you for not helping.",
     reframes: [
       "Saying no to this is saying yes to the work I already own.",
       "A clear boundary is more useful to them than a resentful yes.",
@@ -51,21 +51,21 @@ export const REFRAMES: Reframe[] = [
       "The team survives problems I don't personally solve.",
     ],
     script:
-      "I noticed this and wanted to flag it — happy to share what I know if it's helpful, but I'll leave it in your hands.",
+      "I noticed this and wanted to flag it. Happy to share what I know if it's helpful, but I'll leave it in your hands.",
   },
   {
     id: "diff-1",
     category: "differences",
     trigger: "A colleague's output differs from your preference.",
     innerCritic:
-      "It's not how you would have done it, so it's not really right — the difference is a flaw waiting to be noticed.",
+      "It's not how you would have done it, so it's not really right. The difference is a flaw waiting to be noticed.",
     reframes: [
       "Different is not the same as wrong.",
       "My preference is one valid approach, not the standard.",
       "The work meeting the goal matters more than it matching my taste.",
     ],
     script:
-      "This works. It's not how I'd have approached it, and that's fine — is there anything you'd like a second pair of eyes on?",
+      "This works. It's not how I'd have approached it, and that's fine. Is there anything you'd like a second pair of eyes on?",
   },
   {
     id: "diff-2",
@@ -87,7 +87,7 @@ export const REFRAMES: Reframe[] = [
       "One more pass and it'll finally be right. Stopping now means shipping something with a flaw you could have caught.",
     reframes: [
       "The fifth pass is polishing what was already done on the third.",
-      "Diminishing returns are real — I've crossed that line.",
+      "Diminishing returns are real, and I've crossed that line.",
       "Shipping teaches me more than one more private edit ever will.",
     ],
   },
@@ -108,7 +108,7 @@ export const REFRAMES: Reframe[] = [
     category: "rumination",
     trigger: "You keep replaying a meeting after hours.",
     innerCritic:
-      "If you go over it enough times, you'll find the thing you got wrong — and then you can finally stop.",
+      "If you go over it enough times, you'll find the thing you got wrong. Then you can finally stop.",
     reframes: [
       "Replaying it isn't problem-solving; it's the same loop wearing a groove.",
       "The meeting is over and my nervous system hasn't been told yet.",
@@ -150,7 +150,7 @@ export const CHECKLIST_TEMPLATES: ChecklistTemplate[] = [
   {
     key: "internal_email",
     label: "Internal email or Slack reply",
-    description: "A quick message to a teammate — not a press release.",
+    description: "A quick message to a teammate, not a press release.",
     items: [
       { id: "ie1", label: "Answers the question that was asked", required: true },
       { id: "ie2", label: "Names the next step (or says 'no next step')", required: true },
@@ -162,7 +162,7 @@ export const CHECKLIST_TEMPLATES: ChecklistTemplate[] = [
   {
     key: "weekly_update",
     label: "Weekly status update",
-    description: "What moved, what's stuck, what you need — that's it.",
+    description: "What moved, what's stuck, what you need. That's it.",
     items: [
       { id: "wu1", label: "States what actually shipped this week", required: true },
       { id: "wu2", label: "Flags anything blocked or at risk", required: true },
@@ -240,7 +240,7 @@ export const DAILY_THOUGHTS: DailyThought[] = [
     id: "dt-1",
     category: "Different output",
     setup:
-      "A colleague produces work that differs from how you would have done it \u2014 slide style, code style, email tone.",
+      "A colleague produces work that differs from how you would have done it: slide style, code style, email tone.",
     thought:
       "\u201cDifferent is not deficient. Their version meets the spec; mine would meet a private preference.\u201d",
   },
@@ -248,7 +248,7 @@ export const DAILY_THOUGHTS: DailyThought[] = [
     id: "dt-2",
     category: "Rest is not idleness",
     setup:
-      "You catch yourself needing to be doing something \u2014 anything \u2014 the moment the task ends.",
+      "You catch yourself needing to be doing something, anything, the moment the task ends.",
     thought:
       "\u201cThe urge to keep moving is a nervous system trying to stay safe, not a sign of what's needed.\u201d",
   },
@@ -280,7 +280,7 @@ export const DAILY_THOUGHTS: DailyThought[] = [
     id: "dt-6",
     category: "Being, not doing",
     setup:
-      "Stillness has arrived and it doesn't feel neutral \u2014 it feels like something you should be doing something about.",
+      "Stillness has arrived and it doesn't feel neutral. It feels like something you should be doing something about.",
     thought:
       "\u201cQuiet is not the absence of value. It's where a tired system meets itself.\u201d",
   },
@@ -296,7 +296,7 @@ export const DAILY_THOUGHTS: DailyThought[] = [
     id: "dt-8",
     category: "Small is enough",
     setup:
-      "You want to design the perfect plan before you begin \u2014 the one where nothing goes wrong.",
+      "You want to design the perfect plan before you begin, the one where nothing goes wrong.",
     thought:
       "\u201cThe smallest startable step outperforms the perfect plan I haven't started.\u201d",
   },
@@ -328,7 +328,7 @@ export const DAILY_THOUGHTS: DailyThought[] = [
     id: "dt-12",
     category: "Kind and true",
     setup:
-      "An old, familiar sentence has just moved through you \u2014 not a friendly one.",
+      "An old, familiar sentence has just moved through you, and not a friendly one.",
     thought:
       "\u201cI don't have to argue with the critic. I can hear it, thank it for the warning, and keep going.\u201d",
   },

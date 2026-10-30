@@ -119,7 +119,7 @@ export default function Reframes() {
             Reframes
           </h1>
           <p className="max-w-prose text-sm text-muted-foreground">
-            A library for the loops that catch you — the critic's line, and a
+            A library for the loops that catch you: the critic's line, and a
             few quieter things to think or say instead.
           </p>
         </div>

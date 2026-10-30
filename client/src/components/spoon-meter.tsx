@@ -636,7 +636,7 @@ function EarnBackPanel({ actions, updateAvailable, events, onClose, onLog, onUnd
                   >
                     <span className="flex items-center gap-2" style={{ color: C.ink }}>
                       <span aria-hidden>{iconByAction.get(e.action_id) ?? "•"}</span>
-                      <span>{nameByAction.get(e.action_id) ?? "—"}</span>
+                      <span>{nameByAction.get(e.action_id) ?? "A removed item"}</span>
                       <span className="text-xs" style={{ color: C.inkMute }}>
                         · {t}
                       </span>

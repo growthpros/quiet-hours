@@ -491,63 +491,9 @@ export async function overridesLast7Days(): Promise<number> {
 }
 
 // ---------- Phase transitions ----------
-export interface PhaseSuggestion {
-  fromPhase: string | null;
-  toPhase: string;
-  reason: string;
-}
-
-// Rolling-window check-in analysis, returns a suggestion if the pattern
-// warrants one, otherwise null.
-export function analyzePhaseFromCheckins(
-  checkins: BurnoutCheckinRow[],
-  currentPhase: string | null,
-): PhaseSuggestion | null {
-  if (checkins.length < 5) return null;
-
-  // Take the most recent 5 (and, for the higher-phase check, 7).
-  const recent5 = checkins.slice(-5);
-  const recent7 = checkins.slice(-7);
-
-  const isLower = (state: string | null) =>
-    state === "chasing" || state === "numbing" || state === "frozen";
-  const isSteady = (state: string | null) =>
-    state === "grounded" || state === "drifting";
-
-  const allLower5 = recent5.every(
-    (c) => isLower(c.state) || c.intensity >= 3,
-  );
-  if (allLower5 && currentPhase !== "burnout") {
-    // Suggest a lower-effort phase
-    let next = "rebuilding";
-    if (currentPhase === "stretch") next = "steady";
-    if (currentPhase === "steady") next = "rebuilding";
-    if (currentPhase === "rebuilding") next = "acute_recovery";
-    if (currentPhase === "acute_recovery") next = "burnout";
-    return {
-      fromPhase: currentPhase,
-      toPhase: next,
-      reason: "Your last 5 check-ins have all landed high-intensity. Shifting the phase softens the defaults.",
-    };
-  }
-
-  if (recent7.length >= 7) {
-    const allSteady7 = recent7.every((c) => isSteady(c.state) && c.intensity <= 2);
-    if (allSteady7 && currentPhase !== "stretch") {
-      let next = "steady";
-      if (currentPhase === "acute_recovery") next = "rebuilding";
-      if (currentPhase === "rebuilding") next = "steady";
-      if (currentPhase === "steady") next = "stretch";
-      return {
-        fromPhase: currentPhase,
-        toPhase: next,
-        reason: "Your last 7 check-ins have been grounded or drifting. Ready for a bit more?",
-      };
-    }
-  }
-
-  return null;
-}
+// The suggestion rules live in lib/phases.ts.
+export { analyzePhaseFromCheckins, type PhaseSuggestion } from "@/lib/phases";
+import type { PhaseSuggestion } from "@/lib/phases";
 
 export async function acceptPhaseTransition(sug: PhaseSuggestion): Promise<void> {
   const user_id = await requireUserId();

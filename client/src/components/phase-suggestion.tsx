@@ -4,6 +4,7 @@
 // Never forces the shift, and never suggests the same target more than
 // once every 3 days.
 
+import { phaseDesc, phaseLabel } from "@/lib/phases";
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -19,13 +20,6 @@ import {
 } from "@/lib/spoon-data";
 import { apiRequest } from "@/lib/queryClient";
 
-const PHASE_LABEL: Record<string, string> = {
-  acute_recovery: "Acute recovery",
-  rebuilding: "Rebuilding",
-  steady: "Steady",
-  stretch: "Stretch",
-  burnout: "Burnout",
-};
 
 export function PhaseSuggestionBanner() {
   const qc = useQueryClient();
@@ -100,12 +94,20 @@ export function PhaseSuggestionBanner() {
           </p>
           <p className="font-serif text-lg font-medium leading-tight" style={{ color: "#2A2620" }}>
             {suggestion.fromPhase
-              ? `From ${PHASE_LABEL[suggestion.fromPhase] ?? "unset"} to ${PHASE_LABEL[suggestion.toPhase]}?`
-              : `Try ${PHASE_LABEL[suggestion.toPhase]}?`}
+              ? `From ${phaseLabel(suggestion.fromPhase) ?? "unset"} to ${phaseLabel(suggestion.toPhase)}?`
+              : `Try ${phaseLabel(suggestion.toPhase)}?`}
           </p>
           <p className="font-serif italic text-sm mt-1" style={{ color: "#3D3A34" }}>
             {suggestion.reason}
           </p>
+          <p className="text-sm mt-1" style={{ color: "#3D3A34" }}>
+            {phaseLabel(suggestion.toPhase)}: {phaseDesc(suggestion.toPhase)}
+          </p>
+          {suggestion.toPhase === "acute_recovery" && (
+            <p className="text-sm mt-1" style={{ color: "#3D3A34" }} data-testid="text-burnout-option">
+              If this is burnout, Burnout recovery is on the Foundation page whenever you want it.
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <Button

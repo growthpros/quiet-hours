@@ -65,7 +65,7 @@ function pickNudge(s: Streaks | undefined): Nudge | null {
         eyebrow: "A pattern worth noticing",
         headline: `You've logged Numbing ${suffix}`,
         body:
-          "Not a verdict \u2014 just information. Numbing is what a tired nervous system reaches for when there's something underneath it doesn't want to feel yet. If you can, name what the something might be. You don't have to fix it. Just naming it changes the pull.",
+          "Not a verdict, just information. Numbing is what a tired nervous system reaches for when there's something underneath it doesn't want to feel yet. If you can, name what the something might be. You don't have to fix it. Just naming it changes the pull.",
       };
     }
     if (st === "drifting") {
@@ -73,7 +73,7 @@ function pickNudge(s: Streaks | undefined): Nudge | null {
         eyebrow: "A pattern worth noticing",
         headline: `You've logged Drifting ${suffix}`,
         body:
-          "Something has been consistently pulling you off-course. It might help to look at the \u201cWhat kept pulling you\u201d chips on the Burnout page and pick just one to make a little less available tomorrow \u2014 close a tab, move an app off the home screen, one small thing.",
+          "Something has been consistently pulling you off-course. It might help to look at the \u201cWhat kept pulling you\u201d chips on the Check-in page and pick just one to make a little less available tomorrow: close a tab, move an app off the home screen, one small thing.",
       };
     }
     if (st === "chasing") {
@@ -81,7 +81,7 @@ function pickNudge(s: Streaks | undefined): Nudge | null {
         eyebrow: "A pattern worth noticing",
         headline: `You've logged Chasing ${suffix}`,
         body:
-          "A racing pattern like this often means the day's real priority isn't visible enough. Tomorrow, before anything else, try writing the one real thing on paper \u2014 not in an app \u2014 and doing only that for the first 30 minutes.",
+          "A racing pattern like this often means the day's real priority isn't visible enough. Tomorrow, before anything else, try writing the one real thing on paper, not in an app, and doing only that for the first 30 minutes.",
       };
     }
     if (st === "frozen") {
@@ -89,7 +89,7 @@ function pickNudge(s: Streaks | undefined): Nudge | null {
         eyebrow: "A pattern worth noticing",
         headline: `You've logged Frozen ${suffix}`,
         body:
-          "When freeze shows up repeatedly, it usually means the task is too big or the cost of doing it wrong feels too high. Look at your pulls on the Burnout page \u2014 the task behind the freeze is often hiding in there. Shrinking it, not pushing through it, is the move.",
+          "When freeze shows up repeatedly, it usually means the task is too big or the cost of doing it wrong feels too high. Look at your pulls on the Check-in page. The task behind the freeze is often hiding in there. Shrinking it, not pushing through it, is the move.",
       };
     }
   }
@@ -313,7 +313,7 @@ function TodayInner({
           icon={Heart}
           eyebrow="After it happened"
           title="Log a moment of softening"
-          body="Track when something went a way you wouldn't have chosen — and how you spoke to yourself about it."
+          body="Track when something went a way you wouldn't have chosen, and how you spoke to yourself about it."
           status={
             compassionCount === 0
               ? "no entries yet"
