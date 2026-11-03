@@ -1,4 +1,5 @@
 import { Switch, Route, Router } from "wouter";
+import { TestVersionStrip } from "@/components/test-version-strip";
 import { useHashLocation } from "wouter/use-hash-location";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -67,6 +68,7 @@ function AuthedShell() {
           <AppSidebar />
         </div>
         <div className="flex flex-1 flex-col overflow-hidden">
+          <TestVersionStrip />
           <main className="flex-1 overflow-hidden">
             <ScrollArea className="h-full">
               <div className="mx-auto w-full max-w-6xl px-5 py-8 pb-24 sm:px-8 md:pb-10">
@@ -130,7 +132,13 @@ function AuthGate() {
       </div>
     );
   }
-  if (!session) return <SignIn />;
+  if (!session)
+    return (
+      <>
+        <TestVersionStrip />
+        <SignIn />
+      </>
+    );
   return <AuthedShell />;
 }
 
