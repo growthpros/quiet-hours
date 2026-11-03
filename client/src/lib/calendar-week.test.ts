@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addMonths, groupMonth, groupWeek, weeksAheadFor } from "@/lib/calendar-week";
+import { addMonths, groupMonth, groupWeek, isEmptyDay, weeksAheadFor } from "@/lib/calendar-week";
 import type { TaskRow } from "@/lib/tasks-data";
 import type { RecurringTemplateRow } from "@/lib/recurring-data";
 
@@ -213,5 +213,29 @@ describe("addMonths", () => {
     expect(addMonths("2026-12-05", 1)).toBe("2027-01-01");
     expect(addMonths("2026-01-31", -1)).toBe("2025-12-01");
     expect(addMonths("2026-10-21", 0)).toBe("2026-10-01");
+  });
+});
+
+describe("isEmptyDay (days that shrink to one line on a phone)", () => {
+  const week = groupWeek(
+    [
+      task({ title: "Done Monday", due_date: "2026-10-19", completed_at: 1 }),
+      task({ title: "Friday", due_date: "2026-10-23" }),
+    ],
+    TODAY,
+    0,
+  );
+  const day = (iso: string) => week.days.find((d) => d.iso === iso)!;
+  it("is true for a day with nothing on it, past or future", () => {
+    expect(isEmptyDay(day("2026-10-18"))).toBe(true); // Sunday, already gone
+    expect(isEmptyDay(day("2026-10-24"))).toBe(true); // Saturday, ahead
+  });
+  it("is false when the day has a task, even a finished one", () => {
+    expect(isEmptyDay(day("2026-10-19"))).toBe(false);
+    expect(isEmptyDay(day("2026-10-23"))).toBe(false);
+  });
+  it("is false when a repeat is coming up that day", () => {
+    const upcoming = [{ id: 1 } as RecurringTemplateRow];
+    expect(isEmptyDay({ items: [], upcoming })).toBe(false);
   });
 });
