@@ -537,11 +537,36 @@ New tests for the database check: the test project shows the strip, and the real
 - The test copy showed the strip on the sign-in page and while signed in, at the top on phone and computer, with "Test version" in the tab and no sideways scrolling.
 - A build pointed at the real database showed no strip and a normal tab title. Only its sign-in page was loaded, so nothing was read from the real database.
 
+### 2026-11-03: Calendar and Today on a phone (views and mobile pass, 4 of 4)
+
+**What and why:**
+On a phone the Calendar's week stacks one day per card, and every day took a full card even with nothing on it. A week with a few tasks was a long scroll of mostly empty boxes. The Today page had the same problem in a smaller way: wide gaps and padding built for a computer screen, and the phase badge on the Foundation card wrapped onto two lines and squeezed the title beside it.
+
+What changed (phones only; on a computer the seven-column week and the Today page look the same as before):
+
+- **A day with nothing on it shrinks to one line:** the day, the date, and "Nothing planned". A day that's already gone shows just the day and date. A day with a finished task, or a repeat coming up, keeps its card.
+- **Every day's header is one line:** day, date and the "2 tasks, 2.5 spoons" summary sit side by side instead of stacked.
+- **Today has a little less space** between sections and inside the cards.
+- **The phase badge stays on one line,** with its ⓘ beside it. The card's subtitle moved under the title row so it has the card's full width.
+
+With the sample week below, the Calendar week is about a fifth shorter on a phone (1,556 to 1,260 pixels tall at 390 wide), and Today is about 270 pixels shorter.
+
+**Decisions:**
+None new. Empty days ahead also shrink to one line, not just past days, so the week reads the same way all the way through. Easy to change if Caroline would rather keep full cards for days ahead.
+
+**Database:**
+No change.
+
+**Checked:**
+New tests for which days count as empty (a past or future day with nothing on it is empty; a day with a finished task or a repeat coming up is not). `npm run verify` passes. In a real browser with a sample week (tasks today, tomorrow and in two days, one finished yesterday):
+
+- At 360 and 390 wide: empty days show as one line, days with tasks keep their cards, nothing overlaps, and no sideways scrolling. The phase badge reads "Reduced capacity" on one line.
+- At 1280 wide: the week's seven columns, the month view and Today look as they did.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
 
-- On a phone, empty past days on the Calendar take a full card. Part of the views and mobile pass.
 - Leftover template code (`server/`, `shared/`, Express, SQLite, Passport) still to remove.
 - The test database still sends sign-in email through Supabase's built-in service (2 an hour). Connecting it to Resend would fix that.
 - Phone testing of previews needs the sign-in email to open in the same browser that's signed in to Vercel.

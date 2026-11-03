@@ -396,39 +396,42 @@ export function FoundationCard() {
             background: "rgba(216, 155, 122, 0.15)",
           }}
         />
-        <div className="relative p-6">
-          <div className="flex items-baseline justify-between gap-1 mb-4">
-            <div>
-              <p className="font-serif text-lg font-medium text-[#2A2620]">
-                {isToday ? "Bottom of the Pyramid" : `Foundation, ${humanLabel(date).toLowerCase()}`}
-              </p>
-              <p className="font-serif italic text-sm text-[#58524A] mt-0.5">
-                {isToday
-                  ? "The base has to be steady before anything else."
-                  : "What your foundation looked like that day."}
-              </p>
+        <div className="relative p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <p className="min-w-0 font-serif text-lg font-medium text-[#2A2620]">
+              {isToday ? "Bottom of the Pyramid" : `Foundation, ${humanLabel(date).toLowerCase()}`}
+            </p>
+            {/* The badge and its ⓘ stay together on one line, so the badge
+                doesn't wrap on a phone; the title wraps instead. */}
+            <div className="flex shrink-0 items-center gap-1">
+              <Link href="/foundation">
+                <span
+                  className="inline-block whitespace-nowrap text-xs font-semibold px-3 py-1 rounded-full cursor-pointer"
+                  style={{
+                    background: "rgba(255,255,255,0.7)",
+                    color: "#2A2620",
+                  }}
+                  data-testid="badge-phase"
+                >
+                  {badgeLabel}
+                </span>
+              </Link>
+              {currentPhase && (
+                <InfoTip label="this phase" testId="info-phase-badge">
+                  <p>
+                    <strong>{badgeLabel}.</strong> {phaseDesc(currentPhase)}
+                  </p>
+                  <p className="text-muted-foreground">{EXPLAIN.phases}</p>
+                </InfoTip>
+              )}
             </div>
-            <Link href="/foundation">
-              <span
-                className="inline-block text-xs font-semibold px-3 py-1 rounded-full cursor-pointer"
-                style={{
-                  background: "rgba(255,255,255,0.7)",
-                  color: "#2A2620",
-                }}
-                data-testid="badge-phase"
-              >
-                {badgeLabel}
-              </span>
-            </Link>
-            {currentPhase && (
-              <InfoTip label="this phase" testId="info-phase-badge">
-                <p>
-                  <strong>{badgeLabel}.</strong> {phaseDesc(currentPhase)}
-                </p>
-                <p className="text-muted-foreground">{EXPLAIN.phases}</p>
-              </InfoTip>
-            )}
           </div>
+          {/* Below the title row, so it gets the card's full width on a phone. */}
+          <p className="font-serif italic text-sm text-[#58524A] mt-0.5 mb-4">
+            {isToday
+              ? "The base has to be steady before anything else."
+              : "What your foundation looked like that day."}
+          </p>
 
           {isLoading ? (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-7">

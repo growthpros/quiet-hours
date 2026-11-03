@@ -36,6 +36,14 @@ export interface CalendarDay {
   openHours: number;
 }
 
+/**
+ * A day with nothing to show: no tasks (open, done or missed) and no repeats
+ * coming up. On a phone, where the days stack, these shrink to one line.
+ */
+export function isEmptyDay(day: Pick<CalendarDay, "items" | "upcoming">): boolean {
+  return day.items.length === 0 && day.upcoming.length === 0;
+}
+
 export type UnscheduledGroup = Exclude<DueBucket, "today"> | "anytime";
 
 export const UNSCHEDULED_ORDER: UnscheduledGroup[] = [

@@ -42,6 +42,7 @@ import {
   groupWeek,
   weeksAheadFor,
   UNSCHEDULED_LABEL,
+  isEmptyDay,
   type CalendarDay,
   type CalendarMonth,
   type DayItem,
@@ -264,7 +265,7 @@ export default function Calendar() {
           accessibility={{ announcements }}
         >
           {view === "week" ? (
-            <div className="grid gap-3 md:grid-cols-7" data-testid="calendar-week">
+            <div className="grid gap-2 md:grid-cols-7 md:gap-3" data-testid="calendar-week">
               {week.days.map((d) => (
                 <DayColumn key={d.iso} day={d} drag={drag} />
               ))}
@@ -526,28 +527,40 @@ function MonthChip({ item, drag }: { item: DayItem; drag: DragState }) {
 function DayColumn({ day, drag }: { day: CalendarDay; drag: DragState }) {
   const date = parts(day.iso);
   const b = drag.budgetFor(day);
+  // On a phone the days stack, so a day with nothing on it shrinks to one
+  // line: the day, the date, and "Nothing planned" (or nothing, for a day
+  // that's already gone). On a computer the seven columns keep their shape.
+  const empty = isEmptyDay(day) && !b?.over;
   return (
     <DropDay
       iso={day.iso}
       drag={drag}
       testId={`calendar-day-${day.iso}`}
       over={b?.over}
-      className={`rounded-md border p-3 md:p-2 ${
+      className={`rounded-md border md:p-2 ${empty ? "px-3 py-2" : "p-3"} ${
         b?.over ? "" : day.isToday ? "border-primary/50 bg-primary/5" : "border-border bg-card"
       } ${day.isPast && !drag.active ? "opacity-80" : ""}`}
     >
-      <Link
-        href={`/tasks?date=${day.iso}`}
-        className="block hover:underline"
-        data-testid={`link-day-${day.iso}`}
-      >
-        <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-          {date.toLocaleDateString(undefined, { weekday: "short" })}
-          {day.isToday && " · Today"}
+      {/* Phone: day, date and summary share one line. Computer: stacked. */}
+      <div className="flex items-baseline justify-between gap-3 md:block">
+        <Link
+          href={`/tasks?date=${day.iso}`}
+          className="flex items-baseline gap-2 hover:underline md:block"
+          data-testid={`link-day-${day.iso}`}
+        >
+          <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+            {date.toLocaleDateString(undefined, { weekday: "short" })}
+            {day.isToday && " · Today"}
+          </p>
+          <p className="font-serif text-lg text-foreground">{date.getDate()}</p>
+        </Link>
+        <p
+          className="text-right text-xs italic text-muted-foreground md:min-h-[1rem] md:text-left"
+          data-testid={`summary-${day.iso}`}
+        >
+          {daySummary(day)}
         </p>
-        <p className="font-serif text-lg text-foreground">{date.getDate()}</p>
-      </Link>
-      <p className="min-h-[1rem] text-xs italic text-muted-foreground">{daySummary(day)}</p>
+      </div>
       {b?.over ? (
         <p
           className="mb-2 text-[11px] leading-snug text-foreground/80"
@@ -559,7 +572,7 @@ function DayColumn({ day, drag }: { day: CalendarDay; drag: DragState }) {
           </InfoTip>
         </p>
       ) : (
-        <div className="mb-2" />
+        <div className={empty ? "md:mb-2" : "mb-2"} />
       )}
       <div className="space-y-1.5">
         {day.items.map((item) => (

@@ -122,7 +122,7 @@ function CrossCard({
         className="h-full cursor-pointer hover-elevate"
         data-testid={testid}
       >
-        <CardContent className="flex h-full flex-col gap-3 p-6">
+        <CardContent className="flex h-full flex-col gap-3 p-5 sm:p-6">
           <Icon
             className="h-5 w-5 text-muted-foreground"
             strokeWidth={1.5}
@@ -222,7 +222,7 @@ function TodayInner({
   const { isToday } = useViewingDate();
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-8 sm:space-y-12">
       {/* ---------- Day navigator (previous / next / back to today) ---------- */}
       <DayNavigator />
 
@@ -270,7 +270,7 @@ function TodayInner({
       {isToday && (
         <>
       {/* ---------- Four cross-link cards ---------- */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2 md:gap-4">
         <CrossCard
           href="/tasks"
           icon={LayoutGrid}
@@ -350,7 +350,7 @@ function TodayInner({
           One thought for today
         </p>
         <Card className="border-card-border">
-          <CardContent className="space-y-4 p-6 sm:p-8">
+          <CardContent className="space-y-4 p-5 sm:p-8">
             <span className="inline-block rounded border border-border px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
               {thought.category}
             </span>
