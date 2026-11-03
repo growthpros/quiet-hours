@@ -13,6 +13,8 @@ import {
   CalendarDays,
   Cloud,
   Repeat,
+  Landmark,
+  Sparkles,
 } from "lucide-react";
 import {
   Sidebar,
@@ -41,6 +43,25 @@ export const NAV_ITEMS = [
   { title: "Check-in", url: "/burnout", icon: Waves },
   { title: "History", url: "/history", icon: HistoryIcon },
 ] as const;
+
+// The phone's bottom bar shows these five, plus More. More lists everything
+// else, including pages the sidebar reaches another way (Foundation and Earn
+// back from Today, Settings from the sidebar footer). nav.test.ts checks that
+// every page is reachable on a phone.
+export const PHONE_BAR_URLS = ["/", "/tasks", "/calendar", "/brain-dump", "/burnout"] as const;
+
+export const MORE_EXTRAS = [
+  { title: "Foundation", url: "/foundation", icon: Landmark },
+  { title: "Earn back", url: "/earn-back", icon: Sparkles },
+  { title: "Settings", url: "/settings", icon: SettingsIcon },
+] as const;
+
+export function moreItems() {
+  return [
+    ...NAV_ITEMS.filter((i) => !(PHONE_BAR_URLS as readonly string[]).includes(i.url)),
+    ...MORE_EXTRAS,
+  ];
+}
 
 export function AppSidebar() {
   const [location] = useLocation();

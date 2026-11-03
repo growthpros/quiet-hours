@@ -53,6 +53,8 @@ Checked: tests, test database run, preview, live check.
 | 2026-10-29 | Earn-back starting list: a short walk outside and a nap of 10 minutes or more add 1 spoon; everything else adds half a spoon. Existing accounts switch over with a button. No limit on the day's total; each item keeps its own times-a-day limit. | Caroline |
 | 2026-10-29 | Anyone can add their own restorative or habit-building items (examples: stretching, step work, an audio track) and rename any item. | Caroline |
 | 2026-10-29 | A gentle note when, on 3 days in a week, earn-back was at least a quarter of the day's spoons and the day ran past an ordinary okay day. | Caroline |
+| 2026-10-29 | Phone bottom bar: Today, Tasks, Calendar, Brain dump, Check-in and More. More lists every other page, Settings included. | Caroline |
+| 2026-10-29 | The views and mobile pass goes in as small pull requests: the phone bar, loading errors, a "Test version" strip on previews, then Calendar and Today on a phone. | Caroline |
 | 2026-10-29 | Quiet Hours is aimed at neurodivergent people and uses their own language, "burnout" included. (The general-audience HumanFit configuration from the deep-research project is the one that avoids clinical terms. The neurodivergent tools in the humanfit folder of the Tools project are a separate thing.) | Caroline |
 | 2026-10-29 | Names: "Check-in" in the menu and page title, with "A five-minute burnout check-in" under it. "Your Wave" on Today and History. Phases, heaviest first: Burnout recovery, Reduced capacity, Building back, Steady, Stretch, each with an ⓘ. | Caroline |
 | 2026-10-29 | The app suggests lighter phases only down to Reduced capacity. Only the person moves themselves into Burnout recovery. | Caroline |
@@ -462,11 +464,38 @@ No change.
 - The Foundation page lists the five phases in order.
 - The phone's bottom bar shows "Check-in" with no sideways scrolling.
 
+### 2026-10-29: Phone bottom bar with More (views and mobile pass, 1 of 4)
+
+**What and why:**
+On a phone, the bottom bar crammed 11 buttons onto two rows, and Settings wasn't on it at all, so the only way there was typing the address. That surfaced when Caroline needed to check which account her phone was signed in to.
+
+What changed:
+
+- **The bar holds six buttons:** Today, Tasks, Calendar, Brain dump, Check-in and More, all on one row.
+- **More** opens a panel from the bottom listing every other page with its icon and full name: Repeats, Delegation, Good Enough, Reframes, Compassion, History, Foundation, Earn back and Settings, plus the light and dark mode switch. Choosing one closes the panel.
+- **More is highlighted** while you're on one of its pages, so you can tell where you are.
+- **The computer's sidebar is unchanged.**
+- **A new test** (`nav.test.ts`) reads the app's list of pages and fails if any of them can't be reached on a phone.
+
+**Decisions:**
+See the Decisions table.
+
+**Database:**
+No change.
+
+**Checked:**
+166 tests. In a phone-sized browser (360 and 390 pixels wide, the narrowest common phones):
+
+- All six labels fit with nothing cut off, on one row about 55 pixels tall, with no sideways scrolling.
+- More listed the nine pages. Tapping Settings opened it, closed the panel, and highlighted More.
+- Tapping Brain dump opened it and marked it as the current page.
+- The end of a long page (Settings) clears the bar.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
 
-- On a phone, the bottom bar has 11 buttons and wraps onto two rows, and empty past days take a full card. Part of the views and mobile pass.
+- On a phone, empty past days on the Calendar take a full card. Part of the views and mobile pass.
 - Leftover template code (`server/`, `shared/`, Express, SQLite, Passport) still to remove.
 - The test database still sends sign-in email through Supabase's built-in service (2 an hour). Connecting it to Resend would fix that.
 - Phone testing of previews needs the sign-in email to open in the same browser that's signed in to Vercel.
@@ -476,7 +505,6 @@ Things noticed along the way that aren't scheduled yet:
 - The two or three early-look testers are still to be chosen.
 - The real database still has three accounts with no data that were each used once in July (two gmail.com addresses and caroline@growthpartnerpros.com, which never signed in). Decide whether to remove them before beta.
 - Previews and the live app look the same, which makes it easy to be in the wrong one. A "Test version" strip on previews would help.
-- On a phone, Settings isn't on the bottom bar. Part of the views and mobile pass.
 - The Tasks page shows an empty list when tasks fail to load, instead of saying something went wrong.
 - The test database has no Edge Functions (and no Anthropic key), so AI brain dump sorting and task breakdown don't work on previews.
 - The spoon model is done (changes 1 to 4). Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins. Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins.
