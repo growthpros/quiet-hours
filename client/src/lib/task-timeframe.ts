@@ -8,6 +8,7 @@
 import { spoonsOf, type SpoonTask } from "@/lib/spoon-cost";
 import { addLocalDays, localIsoDate } from "@/lib/local-date";
 import type { TaskRow } from "@/lib/tasks-data";
+import { countable, type FamilyLike } from "@/lib/task-steps";
 
 export type Timeframe =
   | "today"
@@ -120,12 +121,13 @@ export function matchesTimeframe(
 }
 
 // Spoons committed today: the spoons of today's unfinished tasks (typed,
-// or worked out from time and effort). Later days don't count.
+// or worked out from time and effort). Later days don't count. A task with
+// steps counts through its steps (see task-steps.ts).
 export function committedSpoonsToday(
-  tasks: (TaskLike & SpoonTask)[],
+  tasks: (TaskLike & SpoonTask & FamilyLike)[],
   todayIso: string,
 ): number {
-  return tasks
+  return countable(tasks)
     .filter((t) => isOnToday(t, todayIso))
     .reduce((sum, t) => sum + spoonsOf(t), 0);
 }

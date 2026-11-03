@@ -12,7 +12,7 @@ function task(o: Partial<TaskRow>): TaskRow {
     estimated_hours: null, actual_hours: null, complexity: null, social_load: false, dread: false, due_date: null,
     due_bucket: null, billable: false, client_id: null, project_id: null,
     completion_reason: null, rolled_from_date: null, completed_at: null,
-    recurring_template_id: null, archived_at: null, created_at: 0, updated_at: 0, ...o,
+    recurring_template_id: null, archived_at: null, parent_task_id: null, position: null, created_at: 0, updated_at: 0, ...o,
   };
 }
 const titlesOn = (w: ReturnType<typeof groupWeek>, iso: string) =>

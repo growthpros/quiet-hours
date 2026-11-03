@@ -42,6 +42,8 @@ import {
   breakDownTask,
   linkTaskToRecurringTemplate,
   archiveTask,
+  setTasksCompleted,
+  toggleTaskWithSteps,
   parsedItemCostFields,
   DUE_BUCKET_LABEL,
   type TaskRow,
@@ -62,6 +64,27 @@ import {
   type TaskInput,
 } from "@/components/task-fields-form";
 import { ChevronLeft, Repeat, RefreshCw } from "lucide-react";
+import { ToastAction } from "@/components/ui/toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { AddStepForm, StepOrderMenu, StepsSummary } from "@/components/task-steps-panel";
+import {
+  LEVEL_NAME,
+  childrenMap,
+  countLabel,
+  countable,
+  descendants,
+  rootsFor,
+  stepsOf,
+} from "@/lib/task-steps";
 import {
   RecurringPatternForm,
   defaultRecurringPatternValue,
@@ -117,15 +140,19 @@ const TIMEFRAME_LABEL: Record<TimeframeFilter, string> = {
 
 // ---------- Task summary chips (below title, when values are present) ----------
 
-function TaskChips({ task }: { task: TaskRow }) {
+function TaskChips({ task, withSteps = false }: { task: TaskRow; withSteps?: boolean }) {
   const chips: string[] = [];
-  const n = taskSpoons(task);
-  if (n != null) chips.push(`${n} spoon${n === 1 ? "" : "s"}`);
-  if (task.estimated_hours != null) {
-    const h = Number(task.estimated_hours);
-    chips.push(`${h}h`);
+  // A task with steps counts through its steps, so its own spoons, time and
+  // effort aren't shown (the steps summary shows the total instead).
+  if (!withSteps) {
+    const n = taskSpoons(task);
+    if (n != null) chips.push(`${n} spoon${n === 1 ? "" : "s"}`);
+    if (task.estimated_hours != null) {
+      const h = Number(task.estimated_hours);
+      chips.push(`${h}h`);
+    }
+    if (task.complexity) chips.push(`${task.complexity} effort`);
   }
-  if (task.complexity) chips.push(`${task.complexity} effort`);
   if (task.billable) chips.push("billable");
   if (task.due_bucket && task.due_bucket !== "today") {
     chips.push(DUE_BUCKET_LABEL[task.due_bucket]);
@@ -363,8 +390,14 @@ function TaskCard({
   template,
   showMissedActions,
   showLetGoAction,
+  kids,
+  level = 0,
 }: {
   task: TaskRow;
+  // Every task's steps (see lib/task-steps.ts), so the card can show its own.
+  kids: Map<number, TaskRow[]>;
+  // 0 for a task, 1 for a step, 2 for a subtask.
+  level?: 0 | 1 | 2;
   // The parent template if this task was generated from (or adopted by)
   // a recurring template. Null for ad-hoc tasks or orphaned instances
   // whose template was deleted.
@@ -384,6 +417,13 @@ function TaskCard({
   const [completing, setCompleting] = useState(false);
   const [breakingDown, setBreakingDown] = useState(false);
   const [makingRecurring, setMakingRecurring] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const steps = stepsOf(task, kids);
+  const withSteps = steps.length > 0;
+  const stepLevel = (level + 1) as 1 | 2;
+  // Subtasks come with their own setting in a later change; for now a task
+  // can have steps and nothing deeper.
+  const canAddSteps = level === 0;
 
   // True if this task is already an instance of a recurring template.
   // In that case we hide the Make Recurring button (it makes no sense
@@ -394,22 +434,61 @@ function TaskCard({
   const hasEstimatedHours = task.estimated_hours != null;
   const today = localIsoDate();
 
+  const refreshTasks = () => {
+    qc.invalidateQueries({ queryKey: ["tasks"] });
+    qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
+  };
+
+  // Puts back what a tick-off also changed (from the toast's Undo).
+  const undoAlso = useMutation({
+    mutationFn: async (ids: number[]) => setTasksCompleted(ids, null),
+    onSettled: refreshTasks,
+  });
+
   const toggle = useMutation({
     mutationFn: async (opts: {
       actualHours?: number | null;
       reason?: string | null;
       completedAtOverride?: number;
-    }) => {
-      await updateTask(task.id, {
-        completed: !done,
+    }) =>
+      // Keeps steps and the tasks above them in line (lib/task-steps.ts).
+      toggleTaskWithSteps(task, qc.getQueryData<TaskRow[]>(["tasks"]) ?? [], {
         actualHours: opts.actualHours ?? undefined,
         completionReason: opts.reason ?? undefined,
         completedAtOverride: opts.completedAtOverride,
-      });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["tasks"] });
-      qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
+      }),
+    onSuccess: ({ closedSteps, finishedParents }) => {
+      refreshTasks();
+      if (finishedParents.length > 0) {
+        const top = finishedParents[finishedParents.length - 1];
+        toast({
+          title: "That was the last one.",
+          description: `"${top.title}" is ticked off too.`,
+          action: (
+            <ToastAction
+              altText="Keep it open"
+              onClick={() => undoAlso.mutate(finishedParents.map((t) => t.id))}
+              data-testid={`button-undo-parent-${task.id}`}
+            >
+              Undo
+            </ToastAction>
+          ),
+        });
+      } else if (closedSteps.length > 0) {
+        toast({
+          title: "Done, steps and all.",
+          description: "Its open steps are ticked off too.",
+          action: (
+            <ToastAction
+              altText="Reopen the steps"
+              onClick={() => undoAlso.mutate([task.id, ...closedSteps.map((t) => t.id)])}
+              data-testid={`button-undo-steps-${task.id}`}
+            >
+              Undo
+            </ToastAction>
+          ),
+        });
+      }
     },
     onError: (e) => {
       toast({
@@ -450,7 +529,8 @@ function TaskCard({
   });
 
   const archive = useMutation({
-    mutationFn: async () => archiveTask(task.id),
+    // Its steps are let go along with it.
+    mutationFn: async () => archiveTask(task.id, descendants(task, kids).map((t) => t.id)),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
@@ -468,10 +548,17 @@ function TaskCard({
   });
 
   const del = useMutation({
+    // Its steps go with it (on delete cascade, migration 017).
     mutationFn: async () => deleteTask(task.id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
+    },
+    onError: (e) => {
+      toast({
+        title: "Couldn't delete",
+        description: e instanceof Error ? e.message : String(e),
+      });
     },
   });
 
@@ -543,10 +630,23 @@ function TaskCard({
     }
   };
 
+  // A task is a card; a step or subtask sits inside its parent's card,
+  // marked by a line down its left side. Called as a function, not used as
+  // a component, so React keeps what's inside (like a half-typed step).
+  const shell = (children: React.ReactNode) =>
+    level === 0 ? (
+      <Card data-testid={`card-task-${task.id}`}>
+        <CardContent className="space-y-3 p-4">{children}</CardContent>
+      </Card>
+    ) : (
+      <div className="space-y-2 border-l-2 border-border pl-3" data-testid={`card-task-${task.id}`}>
+        {children}
+      </div>
+    );
+
   return (
     <>
-      <Card data-testid={`card-task-${task.id}`}>
-        <CardContent className="space-y-3 p-4">
+      {shell(<>
           {editing ? (
             <div className="space-y-3">
               <TaskFieldsForm
@@ -606,7 +706,8 @@ function TaskCard({
                     {task.notes}
                   </p>
                 )}
-                <TaskChips task={task} />
+                <TaskChips task={task} withSteps={withSteps} />
+                {withSteps && <StepsSummary task={task} kids={kids} level={stepLevel} />}
                 {/* Recurring template pointer. Only shown for generated
                     instances. Clicking navigates to /recurring where the
                     user can edit or pause the template. If the template
@@ -668,7 +769,7 @@ function TaskCard({
                 {!done && !showMissedActions && (
                   <MoveTaskMenu task={task} template={template} />
                 )}
-                {!done && (
+                {!done && level === 0 && (
                   <Button
                     size="icon"
                     variant="ghost"
@@ -681,7 +782,7 @@ function TaskCard({
                     <Split className="h-4 w-4" />
                   </Button>
                 )}
-                {!done && !alreadyRecurring && (
+                {!done && !alreadyRecurring && level === 0 && !withSteps && (
                   <Button
                     size="icon"
                     variant="ghost"
@@ -708,17 +809,50 @@ function TaskCard({
                 <Button
                   size="icon"
                   variant="ghost"
-                  onClick={() => del.mutate()}
+                  onClick={() => (withSteps ? setConfirmingDelete(true) : del.mutate())}
                   aria-label="Delete"
                   data-testid={`button-task-delete-${task.id}`}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
+                {level > 0 && task.parent_task_id != null && (
+                  <StepOrderMenu step={task} siblings={kids.get(task.parent_task_id) ?? []} />
+                )}
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+          {/* Steps sit inside the card, each with its own tick box. */}
+          {!editing && withSteps && (
+            <div className="space-y-2 pl-1 sm:pl-7" data-testid={`steps-${task.id}`}>
+              {steps.map((st) => (
+                <TaskCard key={st.id} task={st} template={null} kids={kids} level={stepLevel} />
+              ))}
+            </div>
+          )}
+          {!editing && !done && canAddSteps && (
+            <div className="pl-1 sm:pl-7">
+              <AddStepForm parent={task} kids={kids} level={stepLevel} />
+            </div>
+          )}
+      </>)}
+
+      <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this and its {LEVEL_NAME[stepLevel].many}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{task.title}" has {countLabel(stepLevel, steps.length)}. Deleting it deletes them too. To keep
+              them, delete the {LEVEL_NAME[stepLevel].many} you don't need instead.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction onClick={() => del.mutate()} data-testid={`button-confirm-delete-${task.id}`}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <CompletionPopup
         open={completing}
@@ -1277,6 +1411,9 @@ export default function Tasks() {
     () => allRows.filter((r) => r.archived_at != null),
     [allRows],
   );
+  // Steps, by task (see lib/task-steps.ts). A step shows inside its task's
+  // card, never as a card of its own.
+  const kids = useMemo(() => childrenMap(nonArchivedRows), [nonArchivedRows]);
 
   const filtered = useMemo(() => {
     if (filter === "active") {
@@ -1368,11 +1505,23 @@ export default function Tasks() {
   const singleDay =
     upcomingWindow != null && upcomingWindow.start === upcomingWindow.end;
 
-  const activeCount = nonArchivedRows.filter(
+  // The cards to show: each matching row's top-level task, once. A step let
+  // go on its own still shows in Archived; one let go with its task shows
+  // inside that task's card there.
+  const shown = useMemo(() => {
+    if (filter !== "archived") return rootsFor(filtered, nonArchivedRows);
+    const archivedIds = new Set(archivedRows.map((r) => r.id));
+    return filtered.filter((r) => r.parent_task_id == null || !archivedIds.has(r.parent_task_id));
+  }, [filter, filtered, nonArchivedRows, archivedRows]);
+  const archivedKids = useMemo(() => childrenMap(archivedRows.map((r) => ({ ...r, archived_at: null }))), [archivedRows]);
+
+  // Counts are of the pieces that count: a task with steps counts as its steps.
+  const counted = countable(nonArchivedRows);
+  const activeCount = counted.filter(
     (r) => r.completed_at == null && !isMissed(r, today),
   ).length;
-  const missedCount = nonArchivedRows.filter((r) => isMissed(r, today)).length;
-  const completedCount = nonArchivedRows.filter(
+  const missedCount = counted.filter((r) => isMissed(r, today)).length;
+  const completedCount = counted.filter(
     (r) => r.completed_at != null,
   ).length;
   const archivedCount = archivedRows.length;
@@ -1580,14 +1729,15 @@ export default function Tasks() {
           onRetry={() => tasksQ.refetch()}
           retrying={tasksQ.isFetching}
         />
-      ) : filtered.length === 0 && upcoming.length === 0 ? (
+      ) : shown.length === 0 && upcoming.length === 0 ? (
         <EmptyState filter={filter} />
       ) : (
         <div className="space-y-3">
-          {filtered.map((t) => (
+          {shown.map((t) => (
             <TaskCard
               key={t.id}
               task={t}
+              kids={filter === "archived" ? archivedKids : kids}
               template={
                 t.recurring_template_id != null
                   ? templatesById.get(t.recurring_template_id) ?? null

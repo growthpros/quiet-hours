@@ -30,6 +30,7 @@ import { MissedRecurringPrompt } from "@/components/missed-recurring-prompt";
 import { DayNavigator, ViewingHistoryRibbon } from "@/components/day-navigator";
 import { ViewingDateProvider, useViewingDate } from "@/lib/viewing-date";
 import { isOnToday } from "@/lib/task-timeframe";
+import { countable } from "@/lib/task-steps";
 import { localIsoDate } from "@/lib/local-date";
 
 function dayOfYear(): number {
@@ -164,9 +165,11 @@ export default function Today() {
     queryKey: ["/api/burnout/streaks"],
   });
 
-  // Only tasks that belong to today, not everything on the list.
-  const openTasks =
-    activeTasksQ.data?.filter((t) => isOnToday(t, localIsoDate())).length ?? 0;
+  // Only tasks that belong to today, not everything on the list. A task with
+  // steps counts through its steps (see lib/task-steps.ts).
+  const openTasks = countable(activeTasksQ.data ?? []).filter((t) =>
+    isOnToday(t, localIsoDate()),
+  ).length;
   const activeRuns =
     checklists.data?.filter((c) => !c.shipped).length ?? 0;
   const scriptCount = 8; // static reframes library size

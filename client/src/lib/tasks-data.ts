@@ -4,6 +4,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { addLocalDays, localIsoDate, startOfLocalDay } from "@/lib/local-date";
+import { childrenMap, openDescendants, parentsFinishedBy, parentsReopenedBy } from "@/lib/task-steps";
 
 // ---------- Row shapes ----------
 
@@ -52,6 +53,11 @@ export interface TaskRow {
   // stays in the DB for reports, but is filtered out of the Tasks page
   // by default.
   archived_at: string | null;
+  // Steps (migration 017): the task this is a step of, or the step this is
+  // a subtask of. Empty for a top-level task. See lib/task-steps.ts.
+  parent_task_id: number | null;
+  // Order among the steps of one parent. Empty sorts last.
+  position: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -139,6 +145,9 @@ export interface CreateTaskInput {
   billable?: boolean;
   clientId?: number | null;
   projectId?: number | null;
+  /** Makes this a step of that task (see lib/task-steps.ts). */
+  parentTaskId?: number | null;
+  position?: number | null;
 }
 
 // A new task has one answer to "when": a timeframe or a specific day, never
@@ -170,6 +179,8 @@ export async function createTask(input: CreateTaskInput): Promise<TaskRow> {
       billable: input.billable ?? false,
       client_id: input.clientId ?? null,
       project_id: input.projectId ?? null,
+      parent_task_id: input.parentTaskId ?? null,
+      position: input.position ?? null,
       completed_at: null,
       created_at: now,
       updated_at: now,
@@ -242,8 +253,66 @@ export async function updateTask(
 }
 
 export async function deleteTask(id: number): Promise<void> {
+  // Its steps and their subtasks go with it (on delete cascade, migration 017).
   const { error } = await supabase.from("tasks").delete().eq("id", id);
   if (error) throw error;
+}
+
+// ---------- Steps (see lib/task-steps.ts) ----------
+
+/**
+ * Tick off (or reopen) several pieces at once: a task and its open steps,
+ * or a step and the task it finished. `completedAt` null reopens them.
+ */
+export async function setTasksCompleted(ids: number[], completedAt: number | null): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await supabase
+    .from("tasks")
+    .update({ completed_at: completedAt, updated_at: Date.now() })
+    .in("id", ids);
+  if (error) throw error;
+}
+
+/**
+ * Tick a task off (or reopen it), keeping its steps and the tasks above it
+ * in line (see lib/task-steps.ts):
+ *   - ticking off a task ticks off its open steps and subtasks too
+ *   - ticking off the last step ticks off its task (and so on up)
+ *   - reopening a step reopens the ticked-off tasks above it
+ * Returns what else changed, so the caller can say so and offer Undo.
+ */
+export async function toggleTaskWithSteps(
+  task: TaskRow,
+  all: TaskRow[],
+  patch: Omit<UpdateTaskPatch, "completed">,
+): Promise<{ closedSteps: TaskRow[]; finishedParents: TaskRow[]; reopenedParents: TaskRow[] }> {
+  const done = task.completed_at != null;
+  const kids = childrenMap(all);
+  if (done) {
+    await updateTask(task.id, { ...patch, completed: false });
+    const reopenedParents = parentsReopenedBy(task.id, all);
+    await setTasksCompleted(reopenedParents.map((t) => t.id), null);
+    return { closedSteps: [], finishedParents: [], reopenedParents };
+  }
+  const at = patch.completedAtOverride ?? Date.now();
+  await updateTask(task.id, { ...patch, completed: true, completedAtOverride: at });
+  const closedSteps = openDescendants(task, kids);
+  await setTasksCompleted(closedSteps.map((t) => t.id), at);
+  const finishedParents = parentsFinishedBy(task.id, all);
+  await setTasksCompleted(finishedParents.map((t) => t.id), at);
+  return { closedSteps, finishedParents, reopenedParents: [] };
+}
+
+/** Save a new order for a task's steps. */
+export async function setStepPositions(order: { id: number; position: number }[]): Promise<void> {
+  const now = Date.now();
+  for (const { id, position } of order) {
+    const { error } = await supabase
+      .from("tasks")
+      .update({ position, updated_at: now })
+      .eq("id", id);
+    if (error) throw error;
+  }
 }
 
 // ---------- Brain Dump ----------
@@ -374,11 +443,12 @@ export async function breakDownTask(input: {
 // Archive ("let it go") a task. Non-destructive; the row keeps all its
 // data. archived_at gets a timestamp; downstream views filter it out
 // of the Tasks page but include it in reports.
-export async function archiveTask(taskId: number): Promise<void> {
+export async function archiveTask(taskId: number, alsoIds: number[] = []): Promise<void> {
+  // alsoIds: a task's steps and subtasks, let go along with it.
   const { error } = await supabase
     .from("tasks")
     .update({ archived_at: new Date().toISOString() })
-    .eq("id", taskId);
+    .in("id", [taskId, ...alsoIds]);
   if (error) throw error;
 }
 
@@ -570,12 +640,14 @@ export async function rollOverPreviousTodayTasks(): Promise<number> {
 export async function moveTask(
   task: Pick<TaskRow, "id" | "due_date" | "due_bucket">,
   to: { dueDate: string | null; dueBucket: DueBucket | null },
+  // Steps that move with it (they shared its timing; see lib/task-steps.ts).
+  alsoIds: number[] = [],
 ): Promise<{ dueDate: string | null; dueBucket: DueBucket | null }> {
   const previous = { dueDate: task.due_date, dueBucket: task.due_bucket };
   const { error } = await supabase
     .from("tasks")
     .update({ due_date: to.dueDate, due_bucket: to.dueBucket, updated_at: Date.now() })
-    .eq("id", task.id);
+    .in("id", [task.id, ...alsoIds]);
   if (error) {
     // 23505 = a repeat already has a copy on that day (unique index).
     if ((error as { code?: string }).code === "23505") {

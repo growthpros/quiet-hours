@@ -516,7 +516,7 @@ function MonthChip({ item, drag }: { item: DayItem; drag: DragState }) {
             ? "italic text-muted-foreground"
             : "text-foreground"
       } ${movable ? "cursor-grab" : ""} ${isDragging ? "opacity-40" : ""}`}
-      title={item.task.title}
+      title={item.partOf ? `${item.task.title} (part of ${item.partOf})` : item.task.title}
       data-testid={`month-task-${item.task.id}`}
     >
       {item.task.title}
@@ -631,6 +631,11 @@ function ItemRow({ item, drag }: { item: DayItem; drag: DragState }) {
           {task.recurring_template_id != null && <RepeatMark />}
           {task.title}
         </p>
+        {item.partOf && (
+          <p className="break-words text-[11px] italic leading-snug text-muted-foreground" data-testid={`part-of-${task.id}`}>
+            Part of {item.partOf}
+          </p>
+        )}
         {(spoons != null || status === "missed") && (
           <p className="text-[11px] text-muted-foreground">
             {[spoons != null ? `${fmt(spoons)} spoon${spoons === 1 ? "" : "s"}` : null, status === "missed" ? "missed" : null]
