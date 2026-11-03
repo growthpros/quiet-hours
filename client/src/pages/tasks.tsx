@@ -575,7 +575,9 @@ function TaskCard({
               </div>
             </div>
           ) : (
-            <div className="flex items-start gap-3">
+            // Phone: the buttons sit in a row under the title, so the title
+            // and details get the card's full width. Computer: beside it.
+            <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 sm:flex">
               <Checkbox
                 checked={done}
                 onCheckedChange={() => handleToggle()}
@@ -664,7 +666,7 @@ function TaskCard({
                   </div>
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-1">
+              <div className="col-start-2 -ml-2 flex shrink-0 flex-wrap items-center gap-1 sm:ml-0">
                 {!done && !showMissedActions && (
                   <MoveTaskMenu task={task} template={template} />
                 )}
@@ -1385,7 +1387,9 @@ export default function Tasks() {
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1 rounded-md border border-border p-1">
+        {/* Phone: the five tabs sit in two rows so the page fits the screen.
+            Computer: one row. */}
+        <div className="grid w-full grid-cols-3 gap-1 rounded-md border border-border p-1 sm:flex sm:w-auto sm:items-center">
           <FilterButton
             label={tasksQ.isSuccess ? `Active (${activeCount})` : "Active"}
             active={filter === "active"}
@@ -1689,7 +1693,7 @@ function FilterButton({
   return (
     <button
       onClick={onClick}
-      className={`rounded px-3 py-1.5 text-xs uppercase tracking-[0.14em] transition ${
+      className={`rounded px-2 py-1.5 text-xs uppercase tracking-[0.14em] transition sm:px-3 ${
         active
           ? "bg-primary text-primary-foreground"
           : "text-muted-foreground hover:bg-muted"
