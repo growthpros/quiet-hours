@@ -575,7 +575,9 @@ function TaskCard({
               </div>
             </div>
           ) : (
-            <div className="flex items-start gap-3">
+            // Phone: the buttons sit in a row under the title, so the title
+            // and details get the card's full width. Computer: beside it.
+            <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 sm:flex">
               <Checkbox
                 checked={done}
                 onCheckedChange={() => handleToggle()}
@@ -664,7 +666,7 @@ function TaskCard({
                   </div>
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-1">
+              <div className="col-start-2 -ml-2 flex shrink-0 flex-wrap items-center gap-1 sm:ml-0">
                 {!done && !showMissedActions && (
                   <MoveTaskMenu task={task} template={template} />
                 )}
