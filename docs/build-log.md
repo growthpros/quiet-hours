@@ -563,6 +563,25 @@ New tests for which days count as empty (a past or future day with nothing on it
 - At 360 and 390 wide: empty days show as one line, days with tasks keep their cards, nothing overlaps, and no sideways scrolling. The phase badge reads "Reduced capacity" on one line.
 - At 1280 wide: the week's seven columns, the month view and Today look as they did.
 
+### 2026-11-03: Pages fit a phone's width (#47)
+
+**What and why:**
+While checking steps on a phone, the Tasks page turned out to be wider than the screen: its right edge was cut off (the end of the subtitle, the All tab, the delete buttons, the footer). The page couldn't be scrolled sideways, so it just looked clipped. Part 4 of the mobile pass missed it because its screenshots were of Today and the Calendar.
+
+Two causes, both fixed:
+
+- **The box every page sits in grew to fit its widest piece** instead of the screen. That box comes from the scroll area around all pages, so the fix is in one place and covers every page.
+- **The Tasks page's five tabs** (Active, Missed, Done, Archived, All) were wider than a phone. On a phone they now sit in two rows; on a computer, one row as before.
+
+**Decisions:**
+None.
+
+**Database:**
+No change.
+
+**Checked:**
+`npm run verify` passes. In a real browser at 360 and 390 wide, every page in the app was measured: nothing runs past the screen's edge (the only thing that does is the soft decorative circle on the Foundation card, which the card trims on purpose). At 1280 wide, the Tasks tabs are one row as before.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:

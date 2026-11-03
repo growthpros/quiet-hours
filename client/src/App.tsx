@@ -70,7 +70,11 @@ function AuthedShell() {
         <div className="flex flex-1 flex-col overflow-hidden">
           <TestVersionStrip />
           <main className="flex-1 overflow-hidden">
-            <ScrollArea className="h-full">
+            {/* The scroll area wraps pages in a box that grows to fit its
+                widest content, which pushed pages past a phone's edge and
+                cut off their right side. Making that box an ordinary block
+                keeps every page to the screen's width. */}
+            <ScrollArea className="h-full [&>[data-radix-scroll-area-viewport]>div]:!block">
               <div className="mx-auto w-full max-w-6xl px-5 py-8 pb-24 sm:px-8 md:pb-10">
                 <AppRouter />
                 <SiteFooter />

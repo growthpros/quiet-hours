@@ -1385,7 +1385,9 @@ export default function Tasks() {
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1 rounded-md border border-border p-1">
+        {/* Phone: the five tabs sit in two rows so the page fits the screen.
+            Computer: one row. */}
+        <div className="grid w-full grid-cols-3 gap-1 rounded-md border border-border p-1 sm:flex sm:w-auto sm:items-center">
           <FilterButton
             label={tasksQ.isSuccess ? `Active (${activeCount})` : "Active"}
             active={filter === "active"}
@@ -1689,7 +1691,7 @@ function FilterButton({
   return (
     <button
       onClick={onClick}
-      className={`rounded px-3 py-1.5 text-xs uppercase tracking-[0.14em] transition ${
+      className={`rounded px-2 py-1.5 text-xs uppercase tracking-[0.14em] transition sm:px-3 ${
         active
           ? "bg-primary text-primary-foreground"
           : "text-muted-foreground hover:bg-muted"
