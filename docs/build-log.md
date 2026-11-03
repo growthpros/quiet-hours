@@ -563,6 +563,35 @@ New tests for which days count as empty (a past or future day with nothing on it
 - At 360 and 390 wide: empty days show as one line, days with tasks keep their cards, nothing overlaps, and no sideways scrolling. The phase badge reads "Reduced capacity" on one line.
 - At 1280 wide: the week's seven columns, the month view and Today look as they did.
 
+### 2026-11-03: Pages and pop-ups fit a phone (#47)
+
+**What and why:**
+While checking steps on a phone, the Tasks page turned out to be wider than the screen: its right edge was cut off (the end of the subtitle, the All tab, the delete buttons, the footer). The page couldn't be scrolled sideways, so it just looked clipped. Part 4 of the mobile pass missed it because its screenshots were of Today and the Calendar.
+
+Caroline then tried New task on her phone and the page seemed to freeze: she couldn't reach the title field, and her phone's browser force-quit once. The New task box was taller than the screen (about 1,000 pixels on a screen showing about 660 with the keyboard up) and couldn't scroll, so its top was above the screen's edge with no way to reach it.
+
+What changed:
+
+- **The box every page sits in grew to fit its widest piece** instead of the screen. That box comes from the scroll area around all pages, so the fix is in one place and covers every page.
+- **The Tasks page's five tabs** (Active, Missed, Done, Archived, All) were wider than a phone. On a phone they now sit in two rows; on a computer, one row as before.
+- **Pop-up boxes on a phone** (New task, editing, confirmations, all of them) now start near the top of the screen and scroll inside themselves, so every field and button can be reached and the keyboard doesn't cover the first field. On a computer they're centred as before.
+- **Task buttons on a phone** sit in a row under the title, so titles and details use the card's full width instead of one or two words a line.
+
+**Decisions:**
+None.
+
+**Database:**
+No change.
+
+**Checked:**
+New guard tests (they fail without the fixes). `npm run verify` passes. In a real browser:
+
+- At 360 and 390 wide, every page in the app was measured: nothing runs past the screen's edge (the only thing that does is the soft decorative circle on the Foundation card, which the card trims on purpose).
+- At 390 wide with the screen shortened to what's left above a phone keyboard, New task opens with its title field in view, typing and backspace work, and the box scrolls to its buttons.
+- At 1280 wide, the Tasks tabs and task buttons are one row and boxes are centred, as before.
+
+The "Couldn't break it down" message on previews is the known gap: the test database has no AI functions (see Open items).
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
