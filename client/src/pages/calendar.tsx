@@ -2,6 +2,7 @@
 // tasks that still need a day. Tasks can be dragged between days; dragging
 // follows the same rules as the Move menu (lib/task-move.ts).
 
+import { LoadError } from "@/components/load-error";
 import { InfoTip } from "@/components/info-tip";
 import { spoonsOf, taskSpoons } from "@/lib/spoon-cost";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -247,6 +248,13 @@ export default function Calendar() {
 
       {tasksQ.isLoading ? (
         <p className="font-serif text-sm italic text-muted-foreground">Loading your calendar…</p>
+      ) : tasksQ.isError ? (
+        <LoadError
+          what="your calendar"
+          error={tasksQ.error}
+          onRetry={() => tasksQ.refetch()}
+          retrying={tasksQ.isFetching}
+        />
       ) : (
         <DndContext
           sensors={sensors}

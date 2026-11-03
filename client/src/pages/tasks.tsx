@@ -5,6 +5,7 @@
 // estimated_hours prompts for actual_hours + reason so the AI can learn
 // how the user actually estimates over time.
 
+import { LoadError } from "@/components/load-error";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
@@ -1386,25 +1387,25 @@ export default function Tasks() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1 rounded-md border border-border p-1">
           <FilterButton
-            label={`Active (${activeCount})`}
+            label={tasksQ.isSuccess ? `Active (${activeCount})` : "Active"}
             active={filter === "active"}
             onClick={() => setFilter("active")}
             testid="filter-active"
           />
           <FilterButton
-            label={`Missed (${missedCount})`}
+            label={tasksQ.isSuccess ? `Missed (${missedCount})` : "Missed"}
             active={filter === "missed"}
             onClick={() => setFilter("missed")}
             testid="filter-missed"
           />
           <FilterButton
-            label={`Done (${completedCount})`}
+            label={tasksQ.isSuccess ? `Done (${completedCount})` : "Done"}
             active={filter === "completed"}
             onClick={() => setFilter("completed")}
             testid="filter-completed"
           />
           <FilterButton
-            label={`Archived (${archivedCount})`}
+            label={tasksQ.isSuccess ? `Archived (${archivedCount})` : "Archived"}
             active={filter === "archived"}
             onClick={() => setFilter("archived")}
             testid="filter-archived"
@@ -1572,6 +1573,13 @@ export default function Tasks() {
         <p className="font-serif text-sm italic text-muted-foreground">
           Loading&hellip;
         </p>
+      ) : tasksQ.isError ? (
+        <LoadError
+          what="your tasks"
+          error={tasksQ.error}
+          onRetry={() => tasksQ.refetch()}
+          retrying={tasksQ.isFetching}
+        />
       ) : filtered.length === 0 && upcoming.length === 0 ? (
         <EmptyState filter={filter} />
       ) : (
