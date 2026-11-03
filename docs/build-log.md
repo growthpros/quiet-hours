@@ -491,6 +491,29 @@ No change.
 - Tapping Brain dump opened it and marked it as the current page.
 - The end of a long page (Settings) clears the bar.
 
+### 2026-11-02: Loading failures say so (views and mobile pass, 2 of 4)
+
+**What and why:**
+When tasks failed to load, the Tasks page and the Calendar showed an empty list, which looks exactly like having nothing to do. That broke the house rule against hiding errors, and it made the phone account mix-up harder to tell apart from a loading problem.
+
+What changed:
+
+- **When tasks don't load,** both pages show a calm message instead of an empty list: "Couldn't load your tasks." (or "your calendar"), "Nothing has been lost. This is usually the connection. Try again in a moment.", a **Try again** button, and a small "What went wrong" with the technical reason. No red.
+- **The Tasks page tabs** show their counts only once tasks have loaded, so a failure doesn't read as "Active (0)."
+- **A new guard test** (`load-error.test.ts`) fails if either page stops handling a loading failure.
+
+**Decisions:**
+None (follows the house rule on errors).
+
+**Database:**
+No change.
+
+**Checked:**
+The guard test fails without the fix and passes with it, and `npm run verify` passes. In a real browser against the test database, with requests for tasks blocked to simulate a dropped connection:
+
+- Both pages showed the message, with no empty-list text and no counts on the tabs.
+- After unblocking, Try again loaded the Calendar with its task, and the Tasks page showed it too.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
@@ -505,9 +528,8 @@ Things noticed along the way that aren't scheduled yet:
 - The two or three early-look testers are still to be chosen.
 - The real database still has three accounts with no data that were each used once in July (two gmail.com addresses and caroline@growthpartnerpros.com, which never signed in). Decide whether to remove them before beta.
 - Previews and the live app look the same, which makes it easy to be in the wrong one. A "Test version" strip on previews would help.
-- The Tasks page shows an empty list when tasks fail to load, instead of saying something went wrong.
 - The test database has no Edge Functions (and no Anthropic key), so AI brain dump sorting and task breakdown don't work on previews.
-- The spoon model is done (changes 1 to 4). Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins. Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins.
+- The spoon model is done (changes 1 to 4). Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins.
 - The Repeats page can show "Nothing repeats yet" for a repeat created outside the app until the page is reloaded. Seen only in testing; repeats made in the app show right away.
 - Not built yet from the spoon rules in spec v3: the 2nd-override heads-up, "Talk it through" and the link to the last crash in the pause, phases changing Foundation, the hours meter, and the two check-in safety rules. "Make it smaller" for moved tasks waits for subtasks.
 - Task breakdown still creates its steps with both a date and a timeframe; subtasks (Phase 2) replace it.
