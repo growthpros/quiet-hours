@@ -514,6 +514,29 @@ The guard test fails without the fix and passes with it, and `npm run verify` pa
 - Both pages showed the message, with no empty-list text and no counts on the tabs.
 - After unblocking, Try again loaded the Calendar with its task, and the Tasks page showed it too.
 
+### 2026-11-02: "Test version" strip on previews (views and mobile pass, 3 of 4)
+
+**What and why:**
+Previews and the live app looked identical. Caroline spent an evening looking at practice data on a preview while her phone showed her real, nearly empty account, and neither screen said which was which.
+
+What changed:
+
+- **Every copy of the app that uses the test database** (previews and local development) shows a thin dusty-blue strip across the top: "Test version. Practice data only, not your real account. Open the live app." It shows on the sign-in page too.
+- **The browser tab** starts with "Test version" as well.
+- **It keys off the database, not the web address,** because the database is what decides whether the data is real. The live app connects to the real database, so it can't show the strip.
+
+**Decisions:**
+None (Caroline asked for the strip when the views and mobile pass was planned).
+
+**Database:**
+No change.
+
+**Checked:**
+New tests for the database check: the test project shows the strip, and the real project or a missing or broken address never does. `npm run verify` passes. In a real browser:
+
+- The test copy showed the strip on the sign-in page and while signed in, at the top on phone and computer, with "Test version" in the tab and no sideways scrolling.
+- A build pointed at the real database showed no strip and a normal tab title. Only its sign-in page was loaded, so nothing was read from the real database.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
@@ -527,7 +550,6 @@ Things noticed along the way that aren't scheduled yet:
 - The Archived filter on the Tasks page compares dates using UTC. It's minor, but it should use the local date like everything else.
 - The two or three early-look testers are still to be chosen.
 - The real database still has three accounts with no data that were each used once in July (two gmail.com addresses and caroline@growthpartnerpros.com, which never signed in). Decide whether to remove them before beta.
-- Previews and the live app look the same, which makes it easy to be in the wrong one. A "Test version" strip on previews would help.
 - The test database has no Edge Functions (and no Anthropic key), so AI brain dump sorting and task breakdown don't work on previews.
 - The spoon model is done (changes 1 to 4). Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins.
 - The Repeats page can show "Nothing repeats yet" for a repeat created outside the app until the page is reloaded. Seen only in testing; repeats made in the app show right away.
