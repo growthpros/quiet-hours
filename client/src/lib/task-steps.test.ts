@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   childrenMap,
   countLabel,
+  displayOrder,
   countable,
   familySpoons,
   movesWith,
@@ -162,6 +163,14 @@ describe("order and grouping", () => {
       { id: f.review.id, position: 3 },
     ]);
     expect(reorder(steps, f.draft.id, "up")).toEqual([]);
+  });
+  it("finished steps show after the open ones, each group in its own order", () => {
+    const f = launch();
+    const steps = childrenMap(f.all).get(f.parent.id)!;
+    // Send (position 3) is done, so it drops below Draft and Review.
+    expect(displayOrder(steps).map((t) => t.title)).toEqual(["Draft", "Review", "Send"]);
+    // Renumbering in the shown order keeps finished steps at the end.
+    expect(reorder(displayOrder(steps), f.review.id, "up").map((o) => o.position)).toEqual([1, 2, 3]);
   });
   it("a matching step shows inside its task, and each task shows once", () => {
     const f = launch();

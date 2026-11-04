@@ -70,6 +70,11 @@ export function hasSteps(t: Pick<Family, "id">, kids: Map<number, unknown[]>): b
   return (kids.get(t.id)?.length ?? 0) > 0;
 }
 
+/** Steps as shown: open ones first (in their order), then finished ones. */
+export function displayOrder<T extends Family>(steps: T[]): T[] {
+  return [...steps.filter((s) => s.completed_at == null), ...steps.filter((s) => s.completed_at != null)];
+}
+
 /**
  * The tasks that count toward a day: everything except tasks that have
  * steps (their steps count instead).

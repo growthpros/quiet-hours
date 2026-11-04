@@ -82,6 +82,7 @@ import {
   countLabel,
   countable,
   descendants,
+  displayOrder,
   rootsFor,
   stepsOf,
 } from "@/lib/task-steps";
@@ -418,7 +419,8 @@ function TaskCard({
   const [breakingDown, setBreakingDown] = useState(false);
   const [makingRecurring, setMakingRecurring] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const steps = stepsOf(task, kids);
+  // Open steps first, then finished ones (lib/task-steps.ts).
+  const steps = displayOrder(stepsOf(task, kids));
   const withSteps = steps.length > 0;
   const stepLevel = (level + 1) as 1 | 2;
   // Subtasks come with their own setting in a later change; for now a task
@@ -474,6 +476,12 @@ function TaskCard({
             </ToastAction>
           ),
         });
+      } else if (!done && level > 0 && task.parent_task_id != null) {
+        // A gentle note for a step that isn't the last one.
+        const left = (kids.get(task.parent_task_id) ?? []).filter(
+          (s) => s.id !== task.id && s.completed_at == null,
+        ).length;
+        if (left > 0) toast({ title: `One down. ${countLabel(level as 1 | 2, left)} to go.` });
       } else if (closedSteps.length > 0) {
         toast({
           title: "Done, steps and all.",
@@ -818,7 +826,7 @@ function TaskCard({
                   <Trash2 className="h-4 w-4" />
                 </Button>
                 {level > 0 && task.parent_task_id != null && (
-                  <StepOrderMenu step={task} siblings={kids.get(task.parent_task_id) ?? []} />
+                  <StepOrderMenu step={task} siblings={displayOrder(kids.get(task.parent_task_id) ?? [])} />
                 )}
               </div>
             </div>

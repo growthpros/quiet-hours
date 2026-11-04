@@ -64,6 +64,8 @@ Checked: tests, test database run, preview, live check.
 | 2026-11-03 | Two levels at most: a task has **Steps**, and a step can have **Subtasks**. | Caroline |
 | 2026-11-03 | Subtasks are off by default. A setting turns them on, which adds "Break this down" and "Add a subtask" to every step. | Caroline |
 | 2026-11-03 | Ticking off the last step ticks off its task too, with a quiet note and Undo. | Caroline |
+| 2026-11-03 | Adding a step offers one-tap quick picks for time and effort. Finished steps move below open ones, and ticking off a step that isn't the last shows a gentle "One down. N steps to go." | Caroline |
+| 2026-11-03 | The AI features are set up on the test database too, so they can be tried on previews. | Caroline |
 | 2026-11-03 | "Break this down" on a task suggests steps; on a step, it suggests subtasks. Suggestions can be edited before saving, and people can add and edit steps and subtasks themselves. | Caroline |
 | 2026-10-27 | Each day's spoons start from the person's "ordinary okay day" (8, 12, 16, 20 or 24 spoons, or their own number from 4 to 30; 12 until they choose), scaled by energy and reduced by other load, as in the spoon research. | Caroline |
 | 2026-10-27 | The ordinary-day question lives in Settings, with an invitation on the spoon meter until it's set. The onboarding version comes with change 4. | Caroline |
@@ -605,6 +607,8 @@ Big tasks are easier to start in small pieces. A task can now have steps: smalle
 What changed:
 
 - **Steps sit inside their task's card** on the Tasks page, with "1 of 3 steps done · 4.5 spoons in all". "Add a step" adds one at the end. Each step can be ticked off, moved to another day, edited (time, effort and so on), deleted, or moved up or down the list.
+- **Adding a step offers quick picks** for time (15 min, 30 min, 1 hr, 2 hr) and effort (Low, Medium, High), one tap each, with "About 2 spoons" worked out as you pick. Without a time, a step has no spoons and doesn't count toward its day, which is why ticking off Caroline's first test steps "didn't change much".
+- **Finished steps move below the open ones**, crossed out, so what's left stays on top. Ticking off a step that isn't the last shows "One down. 2 steps to go."
 - **Only the smallest pieces count.** A task with steps counts through its steps: on Today, on the Calendar, in the spoon meter and in the tab counts. The task's own estimate isn't counted while it has steps, so nothing counts twice. Its total is the sum of its steps.
 - **Each step has its own timing.** A new step starts with its task's (a timeframe or a day) and can be moved on its own. On the Calendar each step shows on its own day with "Part of" and the task's name. The task itself doesn't show there once it has steps.
 - **Ticking off the last step ticks off the task**, with "That was the last one" and Undo. Ticking off a task ticks off its open steps too, also with Undo. Reopening a step reopens its task.
@@ -622,6 +626,7 @@ Migration 017 adds `tasks.parent_task_id` and `tasks.position`. Deleting a task 
 New tests for the rules: what counts toward a day, totals, what ticking off and reopening changes (two levels deep), timing for new and moved steps, order, and grouping on the Tasks page. Tests for today's spoons, spent spoons and the Calendar with steps. `npm run verify` passes. On the test database, the database check refused a third level, a step on another person's task, and moves that would go too deep, and deleting a task removed its steps. In a real browser at 360, 390 and 1280 wide, with a task and two steps:
 
 - Adding a step gave it the task's timing; moving it up the list reordered it.
+- Quick picks: 1 hr Medium showed "About 2 spoons", 15 min Low "About 0.5 spoons", 30 min with no effort "About 1 spoon (effort counts as medium until you pick)"; all three saved with their time and effort. Ticking one off showed "One down. 2 steps to go." and moved it below the others.
 - Ticking off every step ticked off the task with "That was the last one" and Undo; Undo reopened the task.
 - Ticking off the task ticked off its steps; reopening a step from Done reopened the task.
 - Deleting the task asked first, naming its 3 steps.
@@ -641,7 +646,7 @@ Things noticed along the way that aren't scheduled yet:
 - The two or three early-look testers are still to be chosen.
 - The real database still has three accounts with no data that were each used once in July (two gmail.com addresses and caroline@growthpartnerpros.com, which never signed in). Decide whether to remove them before beta.
 - Security check on the test database (Nov 3) flagged three older items: `set_updated_at` doesn't fix its search path; `delete_my_account` runs with extra rights (on purpose, but flagged); leaked-password protection is off (sign-in uses magic links, so it matters less).
-- The test database has no Edge Functions (and no Anthropic key), so AI brain dump sorting and task breakdown don't work on previews.
+- The test database has the two AI functions (deployed Nov 3) but no Anthropic key yet, so AI brain dump sorting and task breakdown don't work on previews until Caroline adds one.
 - The spoon model is done (changes 1 to 4). Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins.
 - The Repeats page can show "Nothing repeats yet" for a repeat created outside the app until the page is reloaded. Seen only in testing; repeats made in the app show right away.
 - Not built yet from the spoon rules in spec v3: the 2nd-override heads-up, "Talk it through" and the link to the last crash in the pause, phases changing Foundation, the hours meter, and the two check-in safety rules. "Make it smaller" for moved tasks waits for subtasks.
