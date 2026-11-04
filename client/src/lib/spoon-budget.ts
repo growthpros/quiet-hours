@@ -12,6 +12,7 @@ import { spoonsOf, type SpoonTask as CostTask } from "@/lib/spoon-cost";
 import { committedSpoonsToday } from "@/lib/task-timeframe";
 import { localIsoDate } from "@/lib/local-date";
 import type { TaskRow } from "@/lib/tasks-data";
+import { countable, type FamilyLike } from "@/lib/task-steps";
 
 export interface LedgerNumbers {
   allotted: number;
@@ -32,11 +33,15 @@ export function todayBudget(
 }
 
 type SpoonTask = CostTask &
-  Pick<TaskRow, "completed_at" | "due_date" | "due_bucket" | "archived_at" | "recurring_template_id">;
+  Pick<TaskRow, "completed_at" | "due_date" | "due_bucket" | "archived_at" | "recurring_template_id"> &
+  FamilyLike;
 
-/** Spoons already used today: logged spending plus tasks finished today. */
+/**
+ * Spoons already used today: logged spending plus tasks finished today.
+ * A task with steps counts through its steps (see task-steps.ts).
+ */
 export function spentToday(tasks: SpoonTask[], ledgerSpent: number, todayIso: string): number {
-  const finished = tasks
+  const finished = countable(tasks)
     .filter(
       (t) =>
         t.completed_at != null &&

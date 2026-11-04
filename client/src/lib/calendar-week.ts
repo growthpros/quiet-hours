@@ -13,6 +13,7 @@ import { spoonsOf } from "@/lib/spoon-cost";
 import { isMissed, isOnToday, weekRange, type WeekStartDay } from "@/lib/task-timeframe";
 import { isoAddDays } from "@/lib/task-move";
 import { expandPattern } from "@/lib/recurring-resolver";
+import { countable } from "@/lib/task-steps";
 import type { DueBucket, TaskRow } from "@/lib/tasks-data";
 import type { RecurringTemplateRow } from "@/lib/recurring-data";
 
@@ -21,6 +22,8 @@ export type DayItemStatus = "open" | "done" | "missed";
 export interface DayItem {
   task: TaskRow;
   status: DayItemStatus;
+  /** For a step or subtask: the title of the task it's part of. */
+  partOf?: string;
 }
 
 export interface CalendarDay {
@@ -102,7 +105,9 @@ export function groupDays(
   end: string,
   templates: RecurringTemplateRow[] = [],
 ): CalendarDay[] {
-  const live = tasks.filter((t) => t.archived_at == null);
+  // A task with steps shows through its steps, each on its own day.
+  const live = countable(tasks.filter((t) => t.archived_at == null));
+  const titleById = new Map(tasks.map((t) => [t.id, t.title]));
   const upcomingByDay = upcomingRepeats(templates, tasks, todayIso, start, end);
   const days: CalendarDay[] = [];
   for (let iso = start; iso <= end; iso = isoAddDays(iso, 1)) {
@@ -116,7 +121,11 @@ export function groupDays(
       return t.due_date === iso && !carriedToToday;
     });
     const items = onDay
-      .map((task) => ({ task, status: statusOf(task, todayIso) }))
+      .map((task) => ({
+        task,
+        status: statusOf(task, todayIso),
+        ...(task.parent_task_id != null ? { partOf: titleById.get(task.parent_task_id) } : {}),
+      }))
       .sort((a, b) => rank(a.status) - rank(b.status));
     const open = items.filter((i) => i.status === "open").map((i) => i.task);
     const upcoming = upcomingByDay.get(iso) ?? [];
@@ -139,7 +148,7 @@ export function groupDays(
 // Tasks with a timeframe but no day, in timeframe order.
 export function groupUnscheduled(tasks: TaskRow[]): CalendarWeek["unscheduled"] {
   const groups = new Map<UnscheduledGroup, TaskRow[]>();
-  for (const t of tasks) {
+  for (const t of countable(tasks)) {
     if (t.archived_at != null || t.completed_at != null || t.due_date) continue;
     if (t.due_bucket === "today") continue; // shown on today's day
     const group: UnscheduledGroup = t.due_bucket ?? "anytime";
