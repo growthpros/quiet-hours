@@ -218,6 +218,15 @@ function formatDueDateLabel(iso: string | null): string {
   return due.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+const ACTUAL_PICKS = [
+  { hours: 0.25, label: "15 min" },
+  { hours: 0.5, label: "30 min" },
+  { hours: 0.75, label: "45 min" },
+  { hours: 1, label: "1 hr" },
+  { hours: 1.5, label: "1.5 hr" },
+  { hours: 2, label: "2 hr" },
+];
+
 function CompletionPopup({
   open,
   task,
@@ -241,7 +250,6 @@ function CompletionPopup({
   }, [task?.id]);
 
   if (!task) return null;
-  const hasEstimated = task.estimated_hours != null;
 
   const estimated = task.estimated_hours;
   const parsedHours = hours.trim() ? Number(hours) : null;
@@ -303,23 +311,38 @@ function CompletionPopup({
               </div>
             </div>
           )}
-          {hasEstimated && (
-            <p className="text-sm italic text-muted-foreground font-serif">
-              No grading. This just helps Quiet Hours learn how you actually
-              estimate so future guesses get closer.
-            </p>
-          )}
+          <p className="text-sm italic text-muted-foreground font-serif">
+            No grading. This just helps Quiet Hours learn how long things
+            really take you, so future guesses get closer.
+          </p>
 
-          {hasEstimated && (
-            <div className="space-y-1.5">
+          <div className="space-y-1.5">
               <Label htmlFor="completion-hours">
-                Actual hours
+                How long it took, in hours
                 {estimated != null && (
                   <span className="ml-2 text-xs italic text-muted-foreground">
                     estimated {estimated}h
                   </span>
                 )}
               </Label>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label="Quick picks for how long it took">
+                {ACTUAL_PICKS.map((pk) => (
+                  <button
+                    key={pk.hours}
+                    type="button"
+                    aria-pressed={parsedHours === pk.hours}
+                    onClick={() => setHours(String(pk.hours))}
+                    className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                      parsedHours === pk.hours
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border text-foreground hover:bg-muted"
+                    }`}
+                    data-testid={`actual-pick-${pk.hours}`}
+                  >
+                    {pk.label}
+                  </button>
+                ))}
+              </div>
               <Input
                 id="completion-hours"
                 type="number"
@@ -340,11 +363,9 @@ function CompletionPopup({
                     : `Right on the estimate.`}
                 </p>
               )}
-            </div>
-          )}
+          </div>
 
-          {hasEstimated && (
-            <div className="space-y-1.5">
+          <div className="space-y-1.5">
               <Label htmlFor="completion-reason">
                 What made it that long or short?{" "}
                 <span className="text-xs italic text-muted-foreground">
@@ -359,12 +380,20 @@ function CompletionPopup({
                 rows={3}
                 data-testid="input-completion-reason"
               />
-            </div>
-          )}
+          </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onCancel}>
-            {hasEstimated ? "Skip" : "Cancel"}
+          {/* Skip ticks it off without saving a time. (It used to close the
+              box without ticking anything off.) Closing the box with the X
+              leaves the task open. */}
+          <Button
+            variant="ghost"
+            onClick={() =>
+              onConfirm(null, null, whenFinished === "yesterday" ? endOfYesterdayMs() : undefined)
+            }
+            data-testid="button-completion-skip"
+          >
+            Skip
           </Button>
           <Button
             onClick={() =>
@@ -376,7 +405,7 @@ function CompletionPopup({
             }
             data-testid="button-completion-save"
           >
-            {hasEstimated ? "Save and complete" : "Complete"}
+            Save and complete
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -433,7 +462,6 @@ function TaskCard({
   const alreadyRecurring = task.recurring_template_id !== null;
 
   const done = task.completed_at != null;
-  const hasEstimatedHours = task.estimated_hours != null;
   const today = localIsoDate();
 
   const refreshTasks = () => {
@@ -627,15 +655,17 @@ function TaskCard({
       toggle.mutate({});
       return;
     }
-    if (pastDue || hasEstimatedHours) {
-      // Past-due tasks always get the popup (for backdating).
-      // Tasks with estimated hours get the popup even if not past due
-      // (for actual-hours + reason capture).
-      setCompleting(true);
-    } else {
-      // Not past-due, no estimate to compare against, complete quietly.
+    if (withSteps) {
+      // A task with steps: its time comes from its steps, which each asked
+      // when they were ticked off, so it isn't asked again here.
       toggle.mutate({});
+      return;
     }
+    // Everything else asks how long it actually took, with room for a note
+    // (Caroline's decision): over time this shows how long each kind of
+    // task really takes, which helps with time blindness. Skip still ticks
+    // it off.
+    setCompleting(true);
   };
 
   // A task is a card; a step or subtask sits inside its parent's card,
