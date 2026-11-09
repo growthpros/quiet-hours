@@ -15,7 +15,7 @@
 //   - Archived ("let go") pieces don't count as steps.
 
 import { spoonsOf, type SpoonTask } from "@/lib/spoon-cost";
-import type { DueBucket, TaskRow } from "@/lib/tasks-data";
+import type { Complexity, DueBucket, ParsedTaskItem, TaskRow } from "@/lib/tasks-data";
 
 /** Task, step, subtask. */
 export const MAX_DEPTH = 2;
@@ -232,4 +232,60 @@ export function rootsFor<T extends Family>(matching: T[], all: T[]): T[] {
   const byId = new Map(all.map((t) => [t.id, t]));
   const rootIds = new Set(matching.map((t) => rootOf(t, byId).id));
   return all.filter((t) => rootIds.has(t.id));
+}
+
+// ---------- "Break this down" (Phase 2, change 3) ----------
+
+/** Where the AI's suggested steps go, chosen in the review box. */
+export type StepsGoTo =
+  | { kind: "parent" } // the task's own timing
+  | { kind: "bucket"; bucket: DueBucket }
+  | { kind: "day"; date: string }; // YYYY-MM-DD, the person's local day
+
+/** One answer to "when" for every new step (a timeframe or a day, never both). */
+export function whenForSteps(
+  goTo: StepsGoTo,
+  parent: Pick<TaskRow, "due_date" | "due_bucket">,
+): { dueDate: string | null; dueBucket: DueBucket | null } {
+  if (goTo.kind === "day") return { dueDate: goTo.date, dueBucket: null };
+  if (goTo.kind === "bucket") return { dueDate: null, dueBucket: goTo.bucket };
+  return newStepWhen(parent);
+}
+
+/** A suggestion as the review box edits it. */
+export interface StepDraft {
+  key: number;
+  title: string;
+  notes: string | null;
+  hours: number | null;
+  effort: Complexity | null;
+  withPeople: boolean;
+  billable: boolean;
+}
+
+/** The AI's suggestions, ready to edit. Blank titles are dropped; at most 10. */
+export function draftsFrom(items: ParsedTaskItem[], parent: Pick<TaskRow, "billable">): StepDraft[] {
+  return items
+    .filter((it) => typeof it.title === "string" && it.title.trim() !== "")
+    .slice(0, 10)
+    .map((it, i) => ({
+      key: i,
+      title: it.title.trim(),
+      notes: it.notes?.trim() || null,
+      hours: typeof it.estimated_hours === "number" && it.estimated_hours > 0 ? it.estimated_hours : null,
+      effort: it.complexity === "low" || it.complexity === "medium" || it.complexity === "high" ? it.complexity : null,
+      withPeople: it.social_load ?? it.with_people ?? false,
+      // Steps of client work are client work; otherwise the AI's guess.
+      billable: parent.billable || (it.billable ?? false),
+    }));
+}
+
+/** Move one draft up or down; returns a new list. */
+export function moveDraft(drafts: StepDraft[], key: number, direction: "up" | "down"): StepDraft[] {
+  const i = drafts.findIndex((d) => d.key === key);
+  const j = direction === "up" ? i - 1 : i + 1;
+  if (i < 0 || j < 0 || j >= drafts.length) return drafts;
+  const next = [...drafts];
+  [next[i], next[j]] = [next[j], next[i]];
+  return next;
 }

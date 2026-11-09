@@ -44,8 +44,8 @@ import {
   archiveTask,
   setTasksCompleted,
   toggleTaskWithSteps,
-  parsedItemCostFields,
   DUE_BUCKET_LABEL,
+  type ParsedTaskItem,
   type TaskRow,
   type DueBucket,
 } from "@/lib/tasks-data";
@@ -76,6 +76,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AddStepForm, StepOrderMenu, StepsSummary } from "@/components/task-steps-panel";
+import { BreakdownReview } from "@/components/breakdown-review";
 import {
   LEVEL_NAME,
   canHaveSteps,
@@ -603,40 +604,24 @@ function TaskCard({
     },
   });
 
+  // "Break this down": the AI's suggestions open in a review box first;
+  // nothing is saved until the person adds them, as steps of this task.
+  // (It used to add them straight away as separate tasks.)
+  const [suggested, setSuggested] = useState<ParsedTaskItem[] | null>(null);
   const breakDown = useMutation({
     mutationFn: async () => {
       setBreakingDown(true);
-      const items = await breakDownTask({
-        title: task.title,
-        notes: task.notes,
-      });
-      // Create each sub-task with due_bucket=today by default
-      for (const it of items) {
-        await createTask({
-          title: it.title,
-          notes: it.notes ?? null,
-          ...parsedItemCostFields(it),
-          dueBucket: task.due_bucket ?? "today",
-          dueDate: task.due_date,
-          billable: it.billable ?? task.billable,
-        });
-      }
-      return items.length;
+      return breakDownTask({ title: task.title, notes: task.notes });
     },
-    onSuccess: (count) => {
+    onSuccess: (items) => {
       setBreakingDown(false);
-      qc.invalidateQueries({ queryKey: ["tasks"] });
-      qc.invalidateQueries({ queryKey: ["/api/spoon/ledger"] });
-      if (count === 0) {
+      if (items.length === 0) {
         toast({
           title: "Already small.",
-          description: "Claude couldn't split this one further.",
+          description: "The AI couldn't split this one further.",
         });
       } else {
-        toast({
-          title: `Added ${count} smaller task${count === 1 ? "" : "s"}.`,
-          description: "The original is still here. Delete it if you want.",
-        });
+        setSuggested(items);
       }
     },
     onError: (e) => {
@@ -887,6 +872,14 @@ function TaskCard({
             </div>
           )}
       </>)}
+
+      <BreakdownReview
+        parent={task}
+        items={suggested}
+        kids={kids}
+        level={stepLevel}
+        onClose={() => setSuggested(null)}
+      />
 
       <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
         <AlertDialogContent>
