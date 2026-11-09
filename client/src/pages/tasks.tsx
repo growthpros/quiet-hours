@@ -696,6 +696,7 @@ function TaskCard({
                 value={editValue}
                 onChange={setEditValue}
                 idPrefix={`edit-task-${task.id}`}
+                taskId={task.id}
               />
               <div className="flex gap-2 pt-2">
                 <Button

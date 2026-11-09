@@ -6,6 +6,7 @@
 // underneath shows the math itself so the number never feels arbitrary.
 
 import { InfoTip } from "@/components/info-tip";
+import { EstimateHint } from "@/components/estimate-hint";
 import { EXPLAIN } from "@/lib/explainers";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,10 +37,19 @@ export function SpoonCostFields({
   onChange,
   idPrefix,
   allowNoEffort = true,
+  hintTitle,
+  hintExcludeId,
 }: {
   value: SpoonCostValue;
   onChange: (next: SpoonCostValue) => void;
   idPrefix: string;
+  /**
+   * The title being estimated. When given, a line under Time shows what
+   * similar finished things usually took (lib/estimate-history.ts).
+   */
+  hintTitle?: string;
+  /** The task being edited, so it isn't compared with itself. */
+  hintExcludeId?: number;
   /** Repeats always have an effort level; one-off tasks can leave it blank. */
   allowNoEffort?: boolean;
 }) {
@@ -76,6 +86,16 @@ export function SpoonCostFields({
           placeholder="1 = an hour, 0.25 = 15 minutes"
           data-testid={`${idPrefix}-hours`}
         />
+        {hintTitle !== undefined && (
+          <EstimateHint
+            title={hintTitle}
+            hours={value.estimatedHours.trim() ? Number(value.estimatedHours) : null}
+            onUse={(h) => set("estimatedHours", String(h))}
+            excludeId={hintExcludeId}
+            showPattern
+            testId={`${idPrefix}-estimate-hint`}
+          />
+        )}
       </div>
 
       <div className="space-y-1.5">

@@ -67,6 +67,8 @@ Checked: tests, test database run, preview, live check.
 | 2026-11-03 | Adding a step offers one-tap quick picks for time and effort. Finished steps move below open ones, and ticking off a step that isn't the last shows a gentle "One down. N steps to go." | Caroline |
 | 2026-11-03 | Ticking something off always asks how long it actually took, with room for a note. Time blindness makes estimating hard; the answers let the app and the AI learn how long each kind of task really takes. | Caroline |
 | 2026-11-03 | The AI features are set up on the test database too, so they can be tried on previews. Caroline added a separate Anthropic key to the test project (Nov 8); brain dump sorting and "Break this down" both work there. | Caroline |
+| 2026-11-09 | Order of the next work: test database email through Resend, then "things like this usually take you…", then tidy-ups. | Caroline |
+| 2026-11-09 | "Things like this" matches on words in the title (instant, free, nothing leaves the app), not AI. AI grouping can come later if words aren't good enough. | Caroline |
 | 2026-11-03 | "Break this down" on a task suggests steps; on a step, it suggests subtasks. Suggestions can be edited before saving, and people can add and edit steps and subtasks themselves. | Caroline |
 | 2026-10-27 | Each day's spoons start from the person's "ordinary okay day" (8, 12, 16, 20 or 24 spoons, or their own number from 4 to 30; 12 until they choose), scaled by energy and reduced by other load, as in the spoon research. | Caroline |
 | 2026-10-27 | The ordinary-day question lives in Settings, with an invitation on the spoon meter until it's set. The onboarding version comes with change 4. | Caroline |
@@ -694,12 +696,49 @@ New tests for who can have smaller pieces and for naming the level below. `npm r
 - Turning the switch off again kept the subtasks showing and hid the add button.
 - Nothing ran past the screen's edge, and no errors on the page.
 
+### 2026-11-09: Test database email through Resend (no pull request)
+
+**What and why:**
+The test database sent sign-in emails through Supabase's built-in service, which allows 2 an hour. Testing a preview a few times locked Caroline out. Caroline set the test project to send through Resend, like the live app, with its own key ("Quiet Hours test", sending only, carolinehinton.com) and the sender name "Quiet Hours Test". The email limit is 30 an hour.
+
+**Database:**
+No change. Settings only, in the Supabase dashboard (custom SMTP and rate limits).
+
+**Checked:**
+Caroline signed in on a preview several times in a row without being blocked. Resend shows the sign-in email from "Quiet Hours Test" for the test project, delivered.
+
+### 2026-11-09: "Things like this usually take you…" (#51)
+
+**What and why:**
+Time blindness makes estimating hard. Since Nov 3, every tick-off asks how long it actually took. This uses those answers to help with the next estimate (spec v3, "How long will this really take?").
+
+What changed:
+
+- **Under Time, in New task and Edit:** once at least 3 finished tasks or steps share a meaningful word with the title ("email", "proposal"), a line says what they usually took: *"Things like this have usually taken you about 1.25 hours (going by 3 you've finished with "email" in the title)."* With "Use 1.25 hours" to fill it in.
+- **If the estimate is more than 30% under that,** it adds "That's a little longer than your estimate," with "Keep mine" to hide it. Close or longer estimates get no note.
+- **Overall pattern:** once there are 5 finished things with both an estimate and a time, a line like *"Overall, things take you about 1.4 times what you estimate."*
+- **In "Add a step"** too, under the quick picks (the similar-things line only).
+- "Usual" is the middle time of the most similar ones (up to 10), to the quarter hour, so one very long day doesn't skew it. Open, let-go and untimed things don't count, and a task being edited isn't compared with itself.
+- It never blocks or grades. Until there's enough history, nothing shows.
+
+**Decisions:**
+See the two 2026-11-09 rows in the Decisions table.
+
+**Database:**
+No change.
+
+**Checked:**
+New tests in `estimate-history.test.ts` (word matching, needing 3 similar, the middle time, when the note shows and when it stays quiet, what's ignored, the overall pattern and its wording). `npm run verify` passes. In a real browser at phone size with 5 finished tasks (3 about email):
+
+- New task "Email the new client": with no time, "usually about 1.25 hours" and "Overall, things take you about 2 times what you estimate."; at 0.5 hours, the note and "Keep mine" appeared; "Use 1.25 hours" filled in 1.25 and the note went away; "Keep mine" hid it; an unrelated title ("Repaint the shed") showed only the overall line.
+- Add a step "Email the attendees": the line appeared, and "Use" changed the step to about 2.5 spoons.
+- Nothing ran past the screen's edge, and no errors on the page.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
 
 - Leftover template code (`server/`, `shared/`, Express, SQLite, Passport) still to remove.
-- The test database still sends sign-in email through Supabase's built-in service (2 an hour). Connecting it to Resend would fix that.
 - Phone testing of previews needs the sign-in email to open in the same browser that's signed in to Vercel.
 - Unused profile columns from the original build (diagnosis, OCPD awareness, age range, gender). Raised as a question for counsel.
 - Fonts load from Google's servers, which see visitors' IP addresses. Hosting them with the app would stop that.
@@ -707,7 +746,6 @@ Things noticed along the way that aren't scheduled yet:
 - The two or three early-look testers are still to be chosen.
 - The real database still has three accounts with no data that were each used once in July (two gmail.com addresses and caroline@growthpartnerpros.com, which never signed in). Decide whether to remove them before beta.
 - Security check on the test database (Nov 3) flagged three older items: `set_updated_at` doesn't fix its search path; `delete_my_account` runs with extra rights (on purpose, but flagged); leaked-password protection is off (sign-in uses magic links, so it matters less).
-- Spec v3 "How long will this really take?": the app now saves how long every task and step actually took, with a note. Using those answers ("things like this usually take you about 1.5 hours") isn't built yet.
 - The spoon model is done (changes 1 to 4). Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins.
 - The Repeats page can show "Nothing repeats yet" for a repeat created outside the app until the page is reloaded. Seen only in testing; repeats made in the app show right away.
 - Not built yet from the spoon rules in spec v3: the 2nd-override heads-up, "Talk it through" and the link to the last crash in the pause, phases changing Foundation, the hours meter, and the two check-in safety rules. "Make it smaller" for moved tasks waits for subtasks.
