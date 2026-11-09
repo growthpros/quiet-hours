@@ -51,6 +51,8 @@ export const EXPLAIN = {
   withPeople:
     "Being with people, on camera, masking, or somewhere noisy or busy takes more out of you. It counts 1.5 times.",
   dread: "Dreading something costs energy before you start. It adds 1 spoon, however long the task is.",
+  subtasks:
+    "A task can have steps. With subtasks on, a step can have smaller pieces of its own. Only the smallest pieces count toward a day, and each level shows the total of what's under it. Turning this off hides the option to add new subtasks; any you already have stay.",
   taskSpoons:
     "Worked out from time and effort, and your own number always wins. Hours past 2 in one go count 1.25 times, because tiredness builds over long stretches.",
 } as const;

@@ -78,6 +78,7 @@ import {
 import { AddStepForm, StepOrderMenu, StepsSummary } from "@/components/task-steps-panel";
 import {
   LEVEL_NAME,
+  canHaveSteps,
   childrenMap,
   countLabel,
   countable,
@@ -422,8 +423,12 @@ function TaskCard({
   showLetGoAction,
   kids,
   level = 0,
+  subtasksOn = false,
 }: {
   task: TaskRow;
+  // The Settings switch for subtasks (migration 018). Off: steps don't
+  // offer "Add a subtask". Subtasks that already exist show either way.
+  subtasksOn?: boolean;
   // Every task's steps (see lib/task-steps.ts), so the card can show its own.
   kids: Map<number, TaskRow[]>;
   // 0 for a task, 1 for a step, 2 for a subtask.
@@ -452,9 +457,9 @@ function TaskCard({
   const steps = displayOrder(stepsOf(task, kids));
   const withSteps = steps.length > 0;
   const stepLevel = (level + 1) as 1 | 2;
-  // Subtasks come with their own setting in a later change; for now a task
-  // can have steps and nothing deeper.
-  const canAddSteps = level === 0;
+  // A task can always have steps; a step can have subtasks when the setting
+  // is on; a subtask can't go deeper (lib/task-steps.ts, MAX_DEPTH).
+  const canAddSteps = canHaveSteps(level, subtasksOn);
 
   // True if this task is already an instance of a recurring template.
   // In that case we hide the Make Recurring button (it makes no sense
@@ -865,7 +870,14 @@ function TaskCard({
           {!editing && withSteps && (
             <div className="space-y-2 pl-1 sm:pl-7" data-testid={`steps-${task.id}`}>
               {steps.map((st) => (
-                <TaskCard key={st.id} task={st} template={null} kids={kids} level={stepLevel} />
+                <TaskCard
+                  key={st.id}
+                  task={st}
+                  template={null}
+                  kids={kids}
+                  level={stepLevel}
+                  subtasksOn={subtasksOn}
+                />
               ))}
             </div>
           )}
@@ -1454,6 +1466,9 @@ export default function Tasks() {
   // Steps, by task (see lib/task-steps.ts). A step shows inside its task's
   // card, never as a card of its own.
   const kids = useMemo(() => childrenMap(nonArchivedRows), [nonArchivedRows]);
+  // Whether steps can have subtasks (Settings, migration 018).
+  const profileQ = useQuery({ queryKey: ["/api/profile"], queryFn: getOrCreateProfile });
+  const subtasksOn = profileQ.data?.show_subtasks === true;
 
   const filtered = useMemo(() => {
     if (filter === "active") {
@@ -1780,6 +1795,7 @@ export default function Tasks() {
               key={t.id}
               task={t}
               kids={filter === "archived" ? archivedKids : kids}
+              subtasksOn={subtasksOn}
               template={
                 t.recurring_template_id != null
                   ? templatesById.get(t.recurring_template_id) ?? null
