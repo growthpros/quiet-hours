@@ -663,6 +663,37 @@ New tests for the review box rules: where steps go (one answer to when), turning
 - Editing a title, removing one, moving one up, changing a time and choosing This week, then "Add 4 steps": the 4 steps saved under the task in the order shown, each in This week with its time and effort, and "Added 4 steps to "Plan the launch email"." No separate tasks were made.
 - Nothing ran past the screen's edge, and no errors on the page.
 
+### 2026-11-09: Subtasks (Phase 2, 2 of 3) (#50)
+
+**What and why:**
+The last piece of Phase 2. A step can now have subtasks, for when a step is still too big to start. They're off by default so steps stay simple on a phone (Caroline's decision, Nov 3).
+
+What changed:
+
+- **A "Subtasks" switch in Settings,** off by default, with an ⓘ. Turning it on adds "Add a subtask" and "Break this down" to every step.
+- **Add a subtask** works like adding a step: a title, quick picks for time and effort, and "About N spoons".
+- **Break this down on a step** suggests subtasks, in the same review box as for a task. The AI is told which task the step belongs to, so its suggestions fit (sent as notes, so the AI function didn't change).
+- **The same rules, one level down:** a step's total is the sum of its subtasks, and only the smallest pieces count toward a day. Ticking off the last subtask ticks off its step, and if that was the last step, the task too.
+- **Turning the switch off** hides both buttons. Subtasks you already have stay and keep counting, so totals never change out of sight.
+- **Fixed before it shipped:** a subtask's card crashed the page, because it asked for the name of a level below subtasks. Caught in the browser check; there's a test for it now.
+
+**Decisions:**
+See the 2026-11-03 rows in the Decisions table (two levels, subtasks off by default, the switch adds both buttons).
+
+**Database:**
+Migration 018 adds `user_profiles.show_subtasks` (off by default). Applied to the test database. Needs applying to the real database before this is merged.
+
+**Checked:**
+New tests for who can have smaller pieces and for naming the level below. `npm run verify` passes. In a real browser at 360 wide, on the test database:
+
+- With the switch off, a step had no "Add a subtask" or "Break this down"; the task still had "Add a step".
+- Turning the switch on saved it. The step then offered both.
+- Adding "Pick the subject line" (15 min) showed "0 of 1 subtask done · 0.5 spoons in all" on the step, and the task's total went up to match.
+- Break this down on the step opened "Smaller subtasks for "Write the launch email"" with 5 suggestions; adding them saved all 5 under the step, with the step's timing.
+- Ticking off every subtask ticked off the step, then the task (its other step was already done), with "That was the last one."
+- Turning the switch off again kept the subtasks showing and hid the add button.
+- Nothing ran past the screen's edge, and no errors on the page.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:

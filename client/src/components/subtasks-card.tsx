@@ -1,5 +1,6 @@
 // Settings card: turn subtasks on or off (migration 018). Off by default, so
-// steps stay simple; on adds "Add a subtask" to every step. The rules live
+// steps stay simple; on adds "Add a subtask" and "Break this down" to every
+// step. The rules live
 // in lib/task-steps.ts.
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";

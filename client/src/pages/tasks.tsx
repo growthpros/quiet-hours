@@ -80,6 +80,7 @@ import { BreakdownReview } from "@/components/breakdown-review";
 import {
   LEVEL_NAME,
   canHaveSteps,
+  childLevel,
   childrenMap,
   countLabel,
   countable,
@@ -457,7 +458,9 @@ function TaskCard({
   // Open steps first, then finished ones (lib/task-steps.ts).
   const steps = displayOrder(stepsOf(task, kids));
   const withSteps = steps.length > 0;
-  const stepLevel = (level + 1) as 1 | 2;
+  // What this piece's own pieces are called (steps or subtasks). A subtask
+  // has none, but the words are still needed for its delete message.
+  const stepLevel = childLevel(level);
   // A task can always have steps; a step can have subtasks when the setting
   // is on; a subtask can't go deeper (lib/task-steps.ts, MAX_DEPTH).
   const canAddSteps = canHaveSteps(level, subtasksOn);
@@ -611,7 +614,19 @@ function TaskCard({
   const breakDown = useMutation({
     mutationFn: async () => {
       setBreakingDown(true);
-      return breakDownTask({ title: task.title, notes: task.notes });
+      // For a step, the AI also gets the task it's part of, so its
+      // subtasks fit the bigger picture. (Sent as notes, so the AI
+      // function itself doesn't change.)
+      const parentTitle =
+        task.parent_task_id != null
+          ? (qc.getQueryData<TaskRow[]>(["tasks"]) ?? []).find((t) => t.id === task.parent_task_id)?.title
+          : undefined;
+      const notes = parentTitle
+        ? [`This is one step of a bigger task: "${parentTitle}". Break down only this step.`, task.notes]
+            .filter(Boolean)
+            .join("\n")
+        : task.notes;
+      return breakDownTask({ title: task.title, notes });
     },
     onSuccess: (items) => {
       setBreakingDown(false);
@@ -799,7 +814,7 @@ function TaskCard({
                 {!done && !showMissedActions && (
                   <MoveTaskMenu task={task} template={template} />
                 )}
-                {!done && level === 0 && (
+                {!done && canAddSteps && (
                   <Button
                     size="icon"
                     variant="ghost"
@@ -873,13 +888,15 @@ function TaskCard({
           )}
       </>)}
 
-      <BreakdownReview
-        parent={task}
-        items={suggested}
-        kids={kids}
-        level={stepLevel}
-        onClose={() => setSuggested(null)}
-      />
+      {canAddSteps && (
+        <BreakdownReview
+          parent={task}
+          items={suggested}
+          kids={kids}
+          level={stepLevel}
+          onClose={() => setSuggested(null)}
+        />
+      )}
 
       <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
         <AlertDialogContent>
