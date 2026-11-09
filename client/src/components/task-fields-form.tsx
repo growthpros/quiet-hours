@@ -62,12 +62,15 @@ interface TaskFieldsFormProps {
   value: TaskFieldsValue;
   onChange: (next: TaskFieldsValue) => void;
   idPrefix: string; // for input ids; unique per instance
+  /** The task being edited, if any, so its estimate hint doesn't count it. */
+  taskId?: number;
 }
 
 export function TaskFieldsForm({
   value,
   onChange,
   idPrefix,
+  taskId,
 }: TaskFieldsFormProps) {
   const set = <K extends keyof TaskFieldsValue>(key: K, v: TaskFieldsValue[K]) =>
     onChange({ ...value, [key]: v });
@@ -100,7 +103,13 @@ export function TaskFieldsForm({
         />
       </div>
 
-      <SpoonCostFields value={value} onChange={(c) => onChange({ ...value, ...c })} idPrefix={idPrefix} />
+      <SpoonCostFields
+        value={value}
+        onChange={(c) => onChange({ ...value, ...c })}
+        idPrefix={idPrefix}
+        hintTitle={value.title}
+        hintExcludeId={taskId}
+      />
 
       <div className="space-y-1.5">
         <Label htmlFor={`${idPrefix}-timeline`}>Timeline</Label>

@@ -20,6 +20,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { createTask, setStepPositions, type Complexity, type TaskRow } from "@/lib/tasks-data";
 import { calculateSpoons } from "@/lib/spoon-cost";
+import { EstimateHint } from "@/components/estimate-hint";
 import { cn } from "@/lib/utils";
 import {
   LEVEL_NAME,
@@ -177,6 +178,12 @@ export function AddStepForm({
           </Pick>
         ))}
       </QuickPicks>
+      <EstimateHint
+        title={title}
+        hours={hours}
+        onUse={(h) => setHours(h)}
+        testId={`step-estimate-hint-${parent.id}`}
+      />
       <p className="text-xs italic text-muted-foreground" data-testid={`step-cost-${parent.id}`}>
         {cost
           ? `About ${fmt(cost.spoons)} spoon${cost.spoons === 1 ? "" : "s"}${effort ? "" : " (effort counts as medium until you pick)"}.`
