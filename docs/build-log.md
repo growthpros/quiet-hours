@@ -637,6 +637,32 @@ New tests for the rules (and a guard test for the how-long box, which fails with
 - Today said "1 for today" (the one step due today). The Calendar showed the steps with "Part of Plan the launch" and not the task.
 - Nothing ran past the screen's edge, and no errors on the page.
 
+### 2026-11-08: "Break this down" makes steps (Phase 2, 3 of 3) (#49)
+
+**What and why:**
+Caroline used "Break this down" on the live app after steps arrived, and the AI's pieces came back as separate tasks instead of rolling up under the task. That was the old behaviour, planned as change 3; it moved ahead of subtasks (change 2) because she's using it now.
+
+What changed:
+
+- **The AI's suggestions open in a review box first.** Nothing is saved until you add them. Each suggestion shows its title (two lines, so long ones can be read), time, effort and "About N spoons". You can edit any of them, remove ones you don't want, and move them up or down.
+- **"Where they go":** with the task (its own timing, the default), Today, This week, Next week, or a specific day. You can still move any step on its own afterwards.
+- **"Add 4 steps"** adds them as steps of the task, after any steps it already has, with the total shown ("4 steps · 5 spoons in all"). They then work like any other step.
+- **Steps of a billable task are billable.** Otherwise the AI's guess is used.
+- The AI function itself is unchanged, so nothing needs deploying.
+
+**Decisions:**
+None new. This is the third change agreed on Nov 3 (see the Decisions table).
+
+**Database:**
+No change.
+
+**Checked:**
+New tests for the review box rules: where steps go (one answer to when), turning suggestions into editable drafts (blank titles dropped, nonsense times and efforts dropped, at most 10, billable from the task), and moving drafts. `npm run verify` passes. In a real browser at phone size, against the test database's AI (which works now):
+
+- "Plan the launch email" got 5 suggestions with times and efforts ("5 steps · 6 spoons in all"). The box fit the screen.
+- Editing a title, removing one, moving one up, changing a time and choosing This week, then "Add 4 steps": the 4 steps saved under the task in the order shown, each in This week with its time and effort, and "Added 4 steps to "Plan the launch email"." No separate tasks were made.
+- Nothing ran past the screen's edge, and no errors on the page.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
@@ -654,4 +680,3 @@ Things noticed along the way that aren't scheduled yet:
 - The spoon model is done (changes 1 to 4). Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins.
 - The Repeats page can show "Nothing repeats yet" for a repeat created outside the app until the page is reloaded. Seen only in testing; repeats made in the app show right away.
 - Not built yet from the spoon rules in spec v3: the 2nd-override heads-up, "Talk it through" and the link to the last crash in the pause, phases changing Foundation, the hours meter, and the two check-in safety rules. "Make it smaller" for moved tasks waits for subtasks.
-- Task breakdown still creates separate tasks (with both a date and a timeframe) instead of steps. Phase 2, change 3 replaces it.

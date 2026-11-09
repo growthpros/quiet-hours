@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   childrenMap,
   countLabel,
+  draftsFrom,
+  moveDraft,
+  whenForSteps,
   displayOrder,
   countable,
   familySpoons,
@@ -177,5 +180,43 @@ describe("order and grouping", () => {
     const other = task({ title: "Other" });
     const all = [other, ...f.all];
     expect(rootsFor([f.review, f.outline, other], all).map((t) => t.title)).toEqual(["Other", "Launch"]);
+  });
+});
+
+describe("Break this down: the review box", () => {
+  const parent = { due_date: "2026-10-23", due_bucket: null, billable: true };
+  it("steps go where the person chooses, with one answer to when", () => {
+    expect(whenForSteps({ kind: "parent" }, parent)).toEqual({ dueDate: "2026-10-23", dueBucket: null });
+    expect(whenForSteps({ kind: "bucket", bucket: "this_week" }, parent)).toEqual({ dueDate: null, dueBucket: "this_week" });
+    expect(whenForSteps({ kind: "day", date: "2026-10-22" }, parent)).toEqual({ dueDate: "2026-10-22", dueBucket: null });
+  });
+  it("turns the AI's suggestions into editable drafts", () => {
+    const d = draftsFrom(
+      [
+        { title: " Draft the outline ", estimated_hours: 0.75, complexity: "medium", with_people: false },
+        { title: "", estimated_hours: 1 },
+        { title: "Ask Pam", estimated_hours: 0.25, complexity: "low", with_people: true, billable: false },
+        { title: "Odd one", estimated_hours: -1, complexity: "extreme" as never },
+      ],
+      parent,
+    );
+    expect(d.map((x) => [x.title, x.hours, x.effort, x.withPeople, x.billable])).toEqual([
+      ["Draft the outline", 0.75, "medium", false, true], // billable from the task
+      ["Ask Pam", 0.25, "low", true, true], // the task is billable, so its steps are
+      ["Odd one", null, null, false, true], // nonsense time and effort are dropped
+    ]);
+  });
+  it("for a task that isn't billable, uses the AI's guess", () => {
+    const d = draftsFrom([{ title: "Client call", billable: true }, { title: "Tidy desk" }], { billable: false });
+    expect(d.map((x) => x.billable)).toEqual([true, false]);
+  });
+  it("keeps at most 10 suggestions", () => {
+    const many = Array.from({ length: 14 }, (_, i) => ({ title: `Step ${i + 1}` }));
+    expect(draftsFrom(many, parent)).toHaveLength(10);
+  });
+  it("moves a draft up or down", () => {
+    const d = draftsFrom([{ title: "A" }, { title: "B" }, { title: "C" }], parent);
+    expect(moveDraft(d, d[2].key, "up").map((x) => x.title)).toEqual(["A", "C", "B"]);
+    expect(moveDraft(d, d[0].key, "up")).toBe(d);
   });
 });
