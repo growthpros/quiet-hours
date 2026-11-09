@@ -26,6 +26,24 @@ export const LEVEL_NAME: Record<1 | 2, { one: string; many: string }> = {
   2: { one: "subtask", many: "subtasks" },
 };
 
+/**
+ * Whether a piece at this level can be given smaller pieces: a task always
+ * can (steps); a step can when subtasks are on in Settings; a subtask
+ * can't, because nothing goes deeper than two levels.
+ */
+export function canHaveSteps(level: 0 | 1 | 2, subtasksOn: boolean): boolean {
+  return level === 0 || (level === 1 && subtasksOn);
+}
+
+/**
+ * The level of the pieces under a piece at this level: 1 (steps) under a
+ * task, 2 (subtasks) under a step. A subtask can't have pieces, so this
+ * stays at 2 rather than naming a level that doesn't exist.
+ */
+export function childLevel(level: 0 | 1 | 2): 1 | 2 {
+  return level === 0 ? 1 : 2;
+}
+
 /** "1 step", "3 subtasks". */
 export function countLabel(level: 1 | 2, n: number): string {
   const name = LEVEL_NAME[level];

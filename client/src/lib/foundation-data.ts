@@ -78,6 +78,8 @@ export interface UserProfileRow {
   week_starts_on: WeekStart;
   // Spoons on an ordinary okay day, 4 to 30; null means use 12 (migration 016).
   usual_budget: number | null;
+  // Whether steps offer "Add a subtask" (migration 018). Off by default.
+  show_subtasks: boolean;
   created_at: number;
   updated_at: number;
 }
@@ -132,6 +134,7 @@ export async function updateProfile(
       | "checkin_cadence_minutes"
       | "week_starts_on"
       | "usual_budget"
+      | "show_subtasks"
     >
   >,
 ): Promise<UserProfileRow> {

@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  LEVEL_NAME,
+  canHaveSteps,
+  childLevel,
   childrenMap,
   countLabel,
   draftsFrom,
@@ -62,6 +65,21 @@ describe("what the levels are called", () => {
     expect(levelOf(f.parent, byId)).toBe(0);
     expect(levelOf(f.draft, byId)).toBe(1);
     expect(levelOf(f.outline, byId)).toBe(2);
+  });
+});
+
+describe("who can have smaller pieces", () => {
+  it("names the level below, and never a level past subtasks (a subtask's card used to crash)", () => {
+    expect(childLevel(0)).toBe(1);
+    expect(childLevel(1)).toBe(2);
+    expect(childLevel(2)).toBe(2);
+    expect(LEVEL_NAME[childLevel(2)].many).toBe("subtasks");
+  });
+  it("a task always can; a step only with subtasks on; a subtask never", () => {
+    expect(canHaveSteps(0, false)).toBe(true);
+    expect(canHaveSteps(1, false)).toBe(false);
+    expect(canHaveSteps(1, true)).toBe(true);
+    expect(canHaveSteps(2, true)).toBe(false);
   });
 });
 
