@@ -745,6 +745,7 @@ What changed:
 - Removed 19 packages the server needed (Express, SQLite, Drizzle, Passport, session storage and their type packages). About 2,700 lines came out of the package lock file.
 - **The one thing the app still borrowed:** four older pages (Delegation, Good Enough, Compassion and Check-in, plus Today and the Wave) took the shapes of their data from `shared/schema.ts`. Those shapes now live in `client/src/lib/app-types.ts`, written out to match exactly.
 - `npm run dev` now starts the app's own dev server (Vite) instead of the old one. CLAUDE.md and the README say so, and the README no longer has em dashes.
+- `npm run build` is now just `vite build`. The old build script ran through a helper (`tsx`) that Vercel's first build of this change couldn't find once the server packages were gone, so the preview failed to build. Building with Vite directly needs no helper.
 
 **Decisions:**
 None new (the Nov 9 order: Resend, then "things like this", then tidy-ups).
@@ -753,7 +754,7 @@ None new (the Nov 9 order: Resend, then "things like this", then tidy-ups).
 No change.
 
 **Checked:**
-`npm run verify` passes (217 tests). A clean install from the lock file works. In a real browser at phone size, every page in the app (all 14) opened with its content and no errors on the page.
+`npm run verify` passes (217 tests). A clean install from the lock file works, and the Vercel preview builds. In a real browser on the preview at phone size, every page in the app (all 14) opened with its content and no errors on the page.
 
 ## Open items
 
