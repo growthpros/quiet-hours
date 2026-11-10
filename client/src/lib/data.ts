@@ -337,6 +337,7 @@ export const USER_DATA_TABLES = [
   "burnout_checkins",
   "checklist_runs",
   "clients",
+  "coach_usage",
   "compassion_entries",
   "daily_foundation_logs",
   "delegation_tasks",

@@ -44,7 +44,7 @@ export function BottomNav() {
             data-testid={`link-bottomnav-${slug(item.title)}`}
           >
             <item.icon className="h-5 w-5" strokeWidth={1.75} />
-            <span className="w-full truncate text-center leading-none">{item.title}</span>
+            <span className="w-full truncate text-center leading-none">{"short" in item ? item.short : item.title}</span>
           </Link>
         ))}
         <button

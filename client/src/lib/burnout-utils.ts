@@ -94,3 +94,21 @@ export function formatTime(ms: number): string {
     minute: "2-digit",
   });
 }
+
+// The words for the check-in's energy and sensory scales (1 to 5). Shared by
+// the Check-in page and the coach's day summary.
+export const ENERGY_SCALE = [
+  { v: 1, label: "Depleted" },
+  { v: 2, label: "Low" },
+  { v: 3, label: "Steady" },
+  { v: 4, label: "Present" },
+  { v: 5, label: "Bright" },
+];
+
+export const SENSORY_SCALE = [
+  { v: 1, label: "Quiet" },
+  { v: 2, label: "Soft" },
+  { v: 3, label: "Noticeable" },
+  { v: 4, label: "A lot" },
+  { v: 5, label: "Overloaded" },
+];
