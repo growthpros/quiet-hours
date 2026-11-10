@@ -91,10 +91,14 @@ export function daySummary(input: SummaryInput): string {
   const spent = spentToday(tasks, ledger ? Number(ledger.spent) : 0, todayIso);
   const committed = committedSpoonsToday(tasks, todayIso);
   const left = budget - spent - committed;
-  const basis = fromCheckin ? "from today's check-in" : "their usual day, no check-in yet";
+  // Spelled out step by step: "9 committed, 7 free" read to the coach as
+  // a shortfall when it means 7 are left after the 9.
+  const basis = fromCheckin ? "set by today's check-in" : "their usual day";
   lines.push(
-    `Spoons: ${num(budget)} today (${basis}), ${num(committed)} committed to open tasks, ${num(spent)} spent, ` +
-      (left >= 0 ? `${num(left)} free.` : `${num(-left)} over.`),
+    `Spoons: ${num(budget)} for today (${basis}). Today's open tasks need ${num(committed)} and ${num(spent)} are already spent, ` +
+      (left >= 0
+        ? `so ${num(left)} are left over after today's tasks.`
+        : `so today's plan is ${num(-left)} over what they have.`),
   );
 
   // Latest check-in today

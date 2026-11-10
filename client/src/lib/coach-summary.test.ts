@@ -53,7 +53,7 @@ describe("what the coach knows about the day", () => {
       [
         "Today is Monday, November 9.",
         // 10 from the check-in; spent 1 logged + 2 done today; committed Draft 2 + Send 1 + dentist 1.
-        "Spoons: 10 today (from today's check-in), 4 committed to open tasks, 3 spent, 3 free.",
+        "Spoons: 10 for today (set by today's check-in). Today's open tasks need 4 and 3 are already spent, so 3 are left over after today's tasks.",
         'Latest check-in: Frozen, energy "Low", sensory "A lot", 2 body signals, about 2 hours ago.',
         "Phase: Reduced capacity.",
         "On today:",
@@ -79,14 +79,14 @@ describe("what the coach knows about the day", () => {
   it("says when there's no check-in yet and uses the usual day", () => {
     const d = { ...day(), checkins: [], ledger: null, phase: null };
     const s = daySummary(d);
-    expect(s).toMatch(/Spoons: 12 today \(their usual day, no check-in yet\)/);
+    expect(s).toMatch(/Spoons: 12 for today \(their usual day\)\./);
     expect(s).toMatch(/Latest check-in: none yet today\./);
     expect(s).toMatch(/Phase: not set\./);
   });
 
   it("says plainly when the day is over its spoons", () => {
     const d = { ...day(), ledger: { allotted: 3, spent: 1, earned_back: 0 } };
-    expect(daySummary(d)).toMatch(/3 spent, 4 over\./);
+    expect(daySummary(d)).toMatch(/so today's plan is 4 over what they have\./);
   });
 
   it("keeps a very full day short, and titles on one line", () => {
