@@ -734,11 +734,32 @@ New tests in `estimate-history.test.ts` (word matching, needing 3 similar, the m
 - Add a step "Email the attendees": the line appeared, and "Use" changed the step to about 2.5 spoons.
 - Nothing ran past the screen's edge, and no errors on the page.
 
+### 2026-11-09: Remove the original template's server (tidy-up) (#52)
+
+**What and why:**
+The app started from a template with its own small server (Express, a SQLite database and Passport sign-in). Since the move to Supabase, nothing used it, but it was still in the code, in the packages installed for every build, and in the house rules as "leftovers to ignore". Removing it means less to read, faster installs, and no chance of building on the wrong thing.
+
+What changed:
+
+- Removed `server/`, `shared/` and `drizzle.config.ts`.
+- Removed 19 packages the server needed (Express, SQLite, Drizzle, Passport, session storage and their type packages). About 2,700 lines came out of the package lock file.
+- **The one thing the app still borrowed:** four older pages (Delegation, Good Enough, Compassion and Check-in, plus Today and the Wave) took the shapes of their data from `shared/schema.ts`. Those shapes now live in `client/src/lib/app-types.ts`, written out to match exactly.
+- `npm run dev` now starts the app's own dev server (Vite) instead of the old one. CLAUDE.md and the README say so, and the README no longer has em dashes.
+- `npm run build` is now just `vite build`. The old build script ran through a helper (`tsx`) that Vercel's first build of this change couldn't find once the server packages were gone, so the preview failed to build. Building with Vite directly needs no helper.
+
+**Decisions:**
+None new (the Nov 9 order: Resend, then "things like this", then tidy-ups).
+
+**Database:**
+No change.
+
+**Checked:**
+`npm run verify` passes (217 tests). A clean install from the lock file works, and the Vercel preview builds. In a real browser on the preview at phone size, every page in the app (all 14) opened with its content and no errors on the page.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
 
-- Leftover template code (`server/`, `shared/`, Express, SQLite, Passport) still to remove.
 - Phone testing of previews needs the sign-in email to open in the same browser that's signed in to Vercel.
 - Unused profile columns from the original build (diagnosis, OCPD awareness, age range, gender). Raised as a question for counsel.
 - Fonts load from Google's servers, which see visitors' IP addresses. Hosting them with the app would stop that.

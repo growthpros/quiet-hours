@@ -15,7 +15,7 @@ import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Sparkles, X } from "lucide-react";
-import type { BurnoutCheckin } from "@shared/schema";
+import type { BurnoutCheckin } from "@/lib/app-types";
 import {
   getOrCreateProfile,
   type UserProfileRow,

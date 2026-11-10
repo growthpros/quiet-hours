@@ -16,7 +16,7 @@ import {
 import type {
   ChecklistRun,
   CompassionEntry,
-} from "@shared/schema";
+} from "@/lib/app-types";
 import { listTasks, type TaskRow } from "@/lib/tasks-data";
 import { DAILY_THOUGHTS } from "@/lib/quiet-hours-data";
 import type { DailyThought } from "@/lib/quiet-hours-data";

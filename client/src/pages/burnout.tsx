@@ -30,7 +30,7 @@ import {
 import { ChevronLeft, ChevronRight, Check, Waves } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import type { BurnoutCheckin } from "@shared/schema";
+import type { BurnoutCheckin } from "@/lib/app-types";
 import {
   startOfTodayMs,
   summarize,

@@ -8,7 +8,7 @@
 //   2+ check-ins degrading (avg rising):    soft foundation suggestion
 //   2+ check-ins persistently Overloaded:   compassionate interrupt
 
-import type { BurnoutCheckin } from "@shared/schema";
+import type { BurnoutCheckin } from "@/lib/app-types";
 import { bandFor } from "@/lib/burnout-utils";
 
 export type WaveMessageKind =
