@@ -69,6 +69,7 @@ Checked: tests, test database run, preview, live check.
 | 2026-11-03 | The AI features are set up on the test database too, so they can be tried on previews. Caroline added a separate Anthropic key to the test project (Nov 8); brain dump sorting and "Break this down" both work there. | Caroline |
 | 2026-11-09 | Order of the next work: test database email through Resend, then "things like this usually take you…", then tidy-ups. | Caroline |
 | 2026-11-09 | "Things like this" matches on words in the title (instant, free, nothing leaves the app), not AI. AI grouping can come later if words aren't good enough. | Caroline |
+| 2026-11-09 | Delete the two empty accounts on the real database. Keep the gmail.com account that has data until its owner is checked with. | Caroline |
 | 2026-11-03 | "Break this down" on a task suggests steps; on a step, it suggests subtasks. Suggestions can be edited before saving, and people can add and edit steps and subtasks themselves. | Caroline |
 | 2026-10-27 | Each day's spoons start from the person's "ordinary okay day" (8, 12, 16, 20 or 24 spoons, or their own number from 4 to 30; 12 until they choose), scaled by energy and reduced by other load, as in the spoon research. | Caroline |
 | 2026-10-27 | The ordinary-day question lives in Settings, with an invitation on the spoon meter until it's set. The onboarding version comes with change 4. | Caroline |
@@ -756,6 +757,20 @@ No change.
 **Checked:**
 `npm run verify` passes (217 tests). A clean install from the lock file works, and the Vercel preview builds. In a real browser on the preview at phone size, every page in the app (all 14) opened with its content and no errors on the page.
 
+### 2026-11-09: Two empty accounts removed from the real database (no pull request)
+
+**What and why:**
+A tidy-up before beta. The real database had four accounts. Caroline's own (caroline@carolinehinton.com) stays. Two had no data and no profile: hollywest525@gmail.com (signed in once on Jul 1) and caroline@growthpartnerpros.com (never signed in). A third gmail.com account had a profile and 12 items from Jul 4, so it looked like a real person had tried the app, and it was kept.
+
+**Decisions:**
+See the 2026-11-09 row in the Decisions table.
+
+**Database:**
+The two empty accounts were deleted from the real database, with Caroline's OK ("delete the two empty ones, ok to update the live database"). Looked first, with her OK to read, and listed every account with its data count before anything was deleted.
+
+**Checked:**
+Two accounts remain (Caroline's and the kept gmail.com one). Nothing was left behind: no sign-in records, sessions or profiles without an account.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
@@ -765,7 +780,7 @@ Things noticed along the way that aren't scheduled yet:
 - Fonts load from Google's servers, which see visitors' IP addresses. Hosting them with the app would stop that.
 - The Archived filter on the Tasks page compares dates using UTC. It's minor, but it should use the local date like everything else.
 - The two or three early-look testers are still to be chosen.
-- The real database still has three accounts with no data that were each used once in July (two gmail.com addresses and caroline@growthpartnerpros.com, which never signed in). Decide whether to remove them before beta.
+- One older account on the real database (a gmail.com address, signed in once on Jul 4) has a profile and 12 items. Kept on purpose: it looks like a real person tried the app. Check with them before removing it.
 - Security check on the test database (Nov 3) flagged three older items: `set_updated_at` doesn't fix its search path; `delete_my_account` runs with extra rights (on purpose, but flagged); leaked-password protection is off (sign-in uses magic links, so it matters less).
 - The spoon model is done (changes 1 to 4). Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins.
 - The Repeats page can show "Nothing repeats yet" for a repeat created outside the app until the page is reloaded. Seen only in testing; repeats made in the app show right away.
