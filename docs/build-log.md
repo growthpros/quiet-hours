@@ -760,7 +760,7 @@ No change.
 ### 2026-11-09: Two empty accounts removed from the real database (no pull request)
 
 **What and why:**
-A tidy-up before beta. The real database had four accounts. Caroline's own (caroline@carolinehinton.com) stays. Two had no data and no profile: hollywest525@gmail.com (signed in once on Jul 1) and caroline@growthpartnerpros.com (never signed in). A third gmail.com account had a profile and 12 items from Jul 4, so it looked like a real person had tried the app, and it was kept.
+A tidy-up before beta. The real database had four accounts. Caroline's own (caroline@carolinehinton.com) stays. Two had no data and no profile: a gmail.com address (signed in once on Jul 1) and caroline@growthpartnerpros.com (never signed in). A third gmail.com account had a profile and 12 items from Jul 4, so it looked like a real person had tried the app, and it was kept.
 
 **Decisions:**
 See the 2026-11-09 row in the Decisions table.
