@@ -9,14 +9,14 @@ Live at [https://quiet-hours-chi-ruby.vercel.app](https://quiet-hours-chi-ruby.v
 
 ## Sections
 
-- **Today** — greeting, cross-links, burnout check card, and one thought for today
-- **Delegation** — urgency × importance matrix with a "releasing control" checkbox
-- **Good Enough** — checklists that define done before you start, with inner-critic scaffolding
-- **Reframes** — cognitive-reframing scripts across over-responsibility, differences, perfectionism, rumination
-- **Compassion** — before/after intensity log for self-compassion moments
-- **Burnout** — 5-minute check-in (energy, sensory, state, symptoms, note) and a daily summary that emphasizes state over score
-- **History** — reflection mirror + browsable feed across all four data streams
-- **Settings** — export data, delete everything, sign out, crisis resources
+- **Today**: greeting, cross-links, burnout check card, and one thought for today
+- **Delegation**: urgency × importance matrix with a "releasing control" checkbox
+- **Good Enough**: checklists that define done before you start, with inner-critic scaffolding
+- **Reframes**: cognitive-reframing scripts across over-responsibility, differences, perfectionism, rumination
+- **Compassion**: before/after intensity log for self-compassion moments
+- **Burnout**: 5-minute check-in (energy, sensory, state, symptoms, note) and a daily summary that emphasizes state over score
+- **History**: reflection mirror + browsable feed across all four data streams
+- **Settings**: export data, delete everything, sign out, crisis resources
 
 ## Stack
 
@@ -34,7 +34,7 @@ cp .env.example .env
 npm run dev
 ```
 
-The dev server runs on port 5000.
+The dev server (Vite) runs on port 5173. Point `.env` at the **test** Supabase project, never the real one.
 
 ## Setting up a fresh Supabase project
 
@@ -105,13 +105,8 @@ client/
       sign-in.tsx
 supabase/
   migration.sql           # Initial schema (run once per fresh project)
-server/                   # LEGACY — from the original SQLite/Express build.
-                          # Not used in production; safe to delete.
-shared/                   # LEGACY — Drizzle schema from the SQLite era.
-                          # Not used in production; safe to delete.
+  migrations/             # Every change since, numbered
+  functions/              # The two AI functions
 ```
 
-The `server/` and `shared/` directories are leftovers from the initial
-SQLite/Express build before migrating to Supabase. They aren't referenced by
-the frontend or the build, but I left them in case you want to see how the
-data model evolved.
+The original template's SQLite/Express server (`server/`, `shared/`) was removed on Nov 9, 2026. Everything runs in the browser against Supabase.

@@ -1,4 +1,4 @@
-import type { BurnoutCheckin } from "@shared/schema";
+import type { BurnoutCheckin } from "@/lib/app-types";
 
 export function startOfTodayMs(): number {
   const d = new Date();

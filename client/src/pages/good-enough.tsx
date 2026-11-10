@@ -36,7 +36,7 @@ import {
   CHECKLIST_TEMPLATES,
   type TemplateItem,
 } from "@/lib/quiet-hours-data";
-import type { ChecklistRun } from "@shared/schema";
+import type { ChecklistRun } from "@/lib/app-types";
 
 interface RunItem {
   id: string;

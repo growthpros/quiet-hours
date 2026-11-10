@@ -75,11 +75,7 @@ The test project holds no real data. Use it freely. Production holds real users'
 - `npm run check`: TypeScript type check
 - `npm test`: unit tests (Vitest). Tests live next to the code as `*.test.ts`.
 - `npm run build`: production build into `dist/public`
-- Local development: `npx vite`, with a `.env` holding the **test** project's URL and publishable key (see `.env.example`). Don't use `npm run dev`: it starts a leftover server (see below).
-
-## Leftovers to ignore
-
-`server/`, `shared/`, `drizzle.config.ts`, and the Express, SQLite and Passport packages are left over from the original template. Nothing in production uses them. Don't build on them. Removing them is planned as its own change.
+- Local development: `npm run dev` (Vite), with a `.env` holding the **test** project's URL and publishable key (see `.env.example`).
 
 ## Product and voice rules
 

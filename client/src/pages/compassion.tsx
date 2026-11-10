@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, ArrowRight, Trash2 } from "lucide-react";
 import { COMPASSION_PROMPTS } from "@/lib/quiet-hours-data";
-import type { CompassionEntry } from "@shared/schema";
+import type { CompassionEntry } from "@/lib/app-types";
 
 function NewEntryDialog() {
   const [open, setOpen] = useState(false);

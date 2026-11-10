@@ -20,7 +20,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Plus, Check, Trash2 } from "lucide-react";
-import type { DelegationTask } from "@shared/schema";
+import type { DelegationTask } from "@/lib/app-types";
 
 type Quadrant = "do" | "schedule" | "delegate" | "drop";
 

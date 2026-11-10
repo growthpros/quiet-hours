@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Waves } from "lucide-react";
-import type { BurnoutCheckin } from "@shared/schema";
+import type { BurnoutCheckin } from "@/lib/app-types";
 import { startOfTodayMs, bandFor, formatTime } from "@/lib/burnout-utils";
 import { apiRequest } from "@/lib/queryClient";
 import { generateWaveMessage } from "@/lib/wave-message";
