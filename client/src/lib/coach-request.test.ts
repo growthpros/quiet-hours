@@ -4,6 +4,7 @@ import {
   isTodaySomewhere,
   readRequest,
   recentHistory,
+  tidyReply,
 } from "../../../supabase/functions/coach/request";
 import { TALK_IT_THROUGH } from "../../../supabase/functions/coach/prompt";
 
@@ -60,7 +61,21 @@ describe("the coach's instructions", () => {
     expect(TALK_IT_THROUGH).toMatch(/not a therapist/);
   });
   it("follow the voice rules themselves", () => {
-    expect(TALK_IT_THROUGH).not.toMatch(/—/);
+    expect(TALK_IT_THROUGH).not.toMatch(/\u2014/);
     expect(TALK_IT_THROUGH).not.toMatch(/!/);
+  });
+});
+
+describe("the coach's replies", () => {
+  it("never carry a dash between phrases or an exclamation mark", () => {
+    expect(tidyReply("Looking at where you are right now - frozen, low energy - the smallest thing")).toBe(
+      "Looking at where you are right now, frozen, low energy, the smallest thing",
+    );
+    expect(tidyReply("One thing\u2014then rest.")).toBe("One thing, then rest.");
+    expect(tidyReply("That counts!")).toBe("That counts.");
+  });
+  it("leaves lists, hyphenated words and numbers alone", () => {
+    const list = "Would any of these fit?\n- Get a glass of water\n- A short reset\nA follow-up, 15-minute task.";
+    expect(tidyReply(list)).toBe(list);
   });
 });

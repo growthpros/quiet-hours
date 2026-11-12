@@ -64,3 +64,17 @@ export function isTodaySomewhere(day: string, nowMs: number): boolean {
   const utcToday = Date.parse(`${new Date(nowMs).toISOString().slice(0, 10)}T00:00:00Z`);
   return Math.abs(d - utcToday) <= 86400000;
 }
+
+/**
+ * The app's voice rules, as a safety net under the prompt: no em or en
+ * dashes, and no spaced hyphen standing in for one ("right now - frozen").
+ * A hyphen that starts a list line is left alone.
+ */
+export function tidyReply(text: string): string {
+  return text
+    .replace(/\s*[\u2014\u2013]\s*/g, ", ")
+    .replace(/(\S) - (?=\S)/g, "$1, ")
+    .replace(/!+/g, ".")
+    .replace(/, ([.,])/g, "$1")
+    .trim();
+}

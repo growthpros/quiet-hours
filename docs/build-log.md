@@ -69,6 +69,13 @@ Checked: tests, test database run, preview, live check.
 | 2026-11-03 | The AI features are set up on the test database too, so they can be tried on previews. Caroline added a separate Anthropic key to the test project (Nov 8); brain dump sorting and "Break this down" both work there. | Caroline |
 | 2026-11-09 | Order of the next work: test database email through Resend, then "things like this usually take you…", then tidy-ups. | Caroline |
 | 2026-11-09 | "Things like this" matches on words in the title (instant, free, nothing leaves the app), not AI. AI grouping can come later if words aren't good enough. | Caroline |
+| 2026-11-09 | "Talk it through" is built from the Calm Commander coaching doc: its ideas and prompts, rebuilt, none of its code. It goes in as four pull requests: the coach, Just one thing, suggested tasks, keeping conversations. Plan doc: "Talk it through: plan v1". | Caroline |
+| 2026-11-09 | Talk it through lives on its own page and opens from moments like a hard check-in, an overloaded day, or a task you keep moving. | Caroline |
+| 2026-11-09 | Beta allowance: 40 coach messages per person per day, a note from 30, reset at local midnight, counts only. A monthly spend limit on the Anthropic workspace (starting at $50) as a backstop. | Caroline |
+| 2026-11-09 | The Nov 9 edits to the two coach prompts (only what the person and the summary say, sized to their energy, short replies, believe "that doesn't fit", crisis lines outside the US). | Caroline |
+| 2026-11-09 | Keeping conversations: each person chooses; Don't keep is the default; kept ones last 30 days, 90 days or until deleted; any one can be deleted. Every tier can keep conversations. | Caroline |
+| 2026-11-09 | Three tiers later, set apart mainly by what the coach can do, each with a message ceiling. Names still open. | Caroline |
+| 2026-11-09 | On the phone's bottom bar, Talk it through ("Talk") takes Check-in's place, and Check-in moves into More. | Caroline |
 | 2026-11-03 | "Break this down" on a task suggests steps; on a step, it suggests subtasks. Suggestions can be edited before saving, and people can add and edit steps and subtasks themselves. | Caroline |
 | 2026-10-27 | Each day's spoons start from the person's "ordinary okay day" (8, 12, 16, 20 or 24 spoons, or their own number from 4 to 30; 12 until they choose), scaled by energy and reduced by other load, as in the spoon research. | Caroline |
 | 2026-10-27 | The ordinary-day question lives in Settings, with an invitation on the spoon meter until it's set. The onboarding version comes with change 4. | Caroline |
@@ -756,6 +763,41 @@ No change.
 **Checked:**
 `npm run verify` passes (217 tests). A clean install from the lock file works, and the Vercel preview builds. In a real browser on the preview at phone size, every page in the app (all 14) opened with its content and no errors on the page.
 
+### 2026-11-11: Talk it through, the coach (part 1 of 4) (#53)
+
+**What and why:**
+"Talk it through" is the coach from the plan doc "Talk it through: plan v1": a calm chat that knows your day and helps you choose one next step. It carries over Calm Commander's ideas and coaching prompt, rebuilt on what Quiet Hours already does. This first part is the coach itself. Nothing is saved yet; keeping conversations is part 4.
+
+What changed:
+
+- **A new page, Talk it through.** It has the chat, a "Start over" button, a line saying the conversation isn't saved, and the crisis resources always in view (988, text HOME to 741741, findahelpline.com) with "a planning companion, not a therapist or a substitute for care."
+- **The phone's bottom bar** now reads Today, Tasks, Calendar, Brain dump, Talk, More. Check-in moved into More. Computers show the full name in the side menu.
+- **A new AI function, `coach`,** with the Talk it through prompt and Caroline's Nov 9 edits. The app sends the whole conversation each time, because the AI keeps no memory between messages. Very long conversations send only the most recent 40 messages.
+- **The day summary** (`coach-summary.ts`) goes with each message, so the coach's advice fits the day. It covers spoons, the latest check-in (state, energy, sensory and how many body signals, not which ones), the phase, today's tasks and steps with spoons and time, missed ones, this week's tasks, and the estimate pattern. Notes, compassion entries and profile details are never sent. It uses the same rules as the Today page and the spoon meter.
+- **40 messages a day in the beta**, with a note from 30 on ("You've got 10 messages left today. They reset at midnight."). At 40, a conversation under way can carry on for up to 10 more, so nobody is cut off mid-way; a new one waits for midnight in the person's own time zone. The crisis resources are never limited. The server enforces the same numbers, and a test fails if the app's copy and the server's copy drift apart.
+- **The count is the only thing stored** (`coach_usage`, migration 019): one number per person per day. People can read their own counts. Only the coach function can add to them, after a reply came back, so nobody can reset their own count and a failed reply doesn't use one up. It's deleted with the account and included in Export.
+- **Nothing anyone says is logged.** When the AI request fails, only its status number is logged.
+- **The coach's replies follow the voice rules.** Besides the prompt, the function swaps any dash between phrases for a comma and any exclamation mark for a period, since the preview showed the coach writing "right now - frozen, low energy - ".
+- The check-in's energy and sensory words moved into `burnout-utils.ts`, so the Check-in page and the summary share one copy.
+
+**Decisions:**
+Talk it through's place on the phone's bottom bar, the "Talk" label, and the coach's plan decisions from Nov 9 (see the table).
+
+**Database:**
+Migration 019 (`coach_usage` and `coach_count_message`) applied to the test database on Nov 9 with Caroline's OK. The security check showed only the three older items already in Open items. Production needs migration 019 and the `coach` function deployed before this merges, with Caroline's OK.
+
+**Checked:**
+`npm run verify` passes (238 tests). On the preview against the test database, as the test user with a seeded day (four tasks on today, one this week, a Frozen check-in):
+
+- The coach named the real tasks, noticed the Frozen check-in, kept replies short and suggested small steps. Told "none of those fit, I'm at my desk," it believed that and offered desk-sized ones.
+- The request carried the day summary and never the check-in note or the names of body signals.
+- From the app, writing a count was refused by row-level security, and calling the counter was refused.
+- With the count set to 30: the "10 left" note. At 39, a new conversation went through to 40, then the "keep going with this conversation" note, and the next message went through to 41. After Start over: "That's all the coach messages for today" and the box turned off.
+- The server, called directly, refused a new conversation past the limit, a made-up date, a conversation out of order, and anyone signed out.
+- The next day the count started again at zero.
+- The page fit a phone (390 wide) and a computer (1280 wide), with no errors on the page.
+- The first summary said "9 committed, 7 free", and the coach read that as a shortfall. The line now says "Today's open tasks need 9 ... so 7 are left over after today's tasks."
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
@@ -769,4 +811,7 @@ Things noticed along the way that aren't scheduled yet:
 - Security check on the test database (Nov 3) flagged three older items: `set_updated_at` doesn't fix its search path; `delete_my_account` runs with extra rights (on purpose, but flagged); leaked-password protection is off (sign-in uses magic links, so it matters less).
 - The spoon model is done (changes 1 to 4). Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins.
 - The Repeats page can show "Nothing repeats yet" for a repeat created outside the app until the page is reloaded. Seen only in testing; repeats made in the app show right away.
-- Not built yet from the spoon rules in spec v3: the 2nd-override heads-up, "Talk it through" and the link to the last crash in the pause, phases changing Foundation, the hours meter, and the two check-in safety rules. "Make it smaller" for moved tasks waits for subtasks.
+- Not built yet from the spoon rules in spec v3: the 2nd-override heads-up, the link to the last crash in the pause, phases changing Foundation, the hours meter, and the two check-in safety rules. "Make it smaller" for moved tasks waits for subtasks.
+- Talk it through parts 2 to 4 (Just one thing, suggested tasks, keeping conversations), and opening the coach from a hard check-in, an overloaded day or a task you keep moving.
+- The coach still sometimes asks two questions in one reply and uses "just" in a soft way ("just look at it"). Worth watching in beta before changing the prompt again.
+- The monthly spend limit on the Anthropic workspace needs setting before beta testers use the coach.

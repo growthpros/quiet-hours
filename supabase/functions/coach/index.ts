@@ -16,7 +16,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { callClaudeChat } from "../_shared/claude.ts";
 import { SUMMARY_HEADING, TALK_IT_THROUGH } from "./prompt.ts";
 import { canSend } from "./allowance.ts";
-import { isTodaySomewhere, readRequest, recentHistory } from "./request.ts";
+import { isTodaySomewhere, readRequest, recentHistory, tidyReply } from "./request.ts";
 
 // Problems come back as 200 with an error message, the same as the other AI
 // functions, so the app can show the real reason instead of "non-2xx".
@@ -93,5 +93,5 @@ Deno.serve(async (req) => {
     console.error("coach: couldn't count the message", countErr.code);
   }
 
-  return reply({ reply: text.trim(), sentToday: countErr ? sentToday + 1 : Number(total) });
+  return reply({ reply: tidyReply(text), sentToday: countErr ? sentToday + 1 : Number(total) });
 });
