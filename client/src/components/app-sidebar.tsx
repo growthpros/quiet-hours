@@ -15,6 +15,7 @@ import {
   Repeat,
   Landmark,
   Sparkles,
+  MessagesSquare,
 } from "lucide-react";
 import {
   Sidebar,
@@ -36,6 +37,8 @@ export const NAV_ITEMS = [
   { title: "Calendar", url: "/calendar", icon: CalendarDays },
   { title: "Repeats", url: "/recurring", icon: Repeat },
   { title: "Brain dump", url: "/brain-dump", icon: Cloud },
+  // "Talk" on the phone's bottom bar, where the full name doesn't fit.
+  { title: "Talk it through", short: "Talk", url: "/talk", icon: MessagesSquare },
   { title: "Delegation", url: "/delegation", icon: Split },
   { title: "Good Enough", url: "/good-enough", icon: ListChecks },
   { title: "Reframes", url: "/reframes", icon: Quote },
@@ -44,11 +47,12 @@ export const NAV_ITEMS = [
   { title: "History", url: "/history", icon: HistoryIcon },
 ] as const;
 
-// The phone's bottom bar shows these five, plus More. More lists everything
+// The phone's bottom bar shows these five, plus More. Check-in moved to More
+// to make room for Talk it through (Caroline's decision, Nov 9). More lists everything
 // else, including pages the sidebar reaches another way (Foundation and Earn
 // back from Today, Settings from the sidebar footer). nav.test.ts checks that
 // every page is reachable on a phone.
-export const PHONE_BAR_URLS = ["/", "/tasks", "/calendar", "/brain-dump", "/burnout"] as const;
+export const PHONE_BAR_URLS = ["/", "/tasks", "/calendar", "/brain-dump", "/talk"] as const;
 
 export const MORE_EXTRAS = [
   { title: "Foundation", url: "/foundation", icon: Landmark },

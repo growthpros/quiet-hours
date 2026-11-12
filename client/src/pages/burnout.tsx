@@ -48,22 +48,9 @@ import { basisLine, loadDetail } from "@/lib/daily-budget";
 import { InfoTip } from "@/components/info-tip";
 import { EXPLAIN } from "@/lib/explainers";
 import type { BurnoutCheckinRow } from "@/lib/supabase";
+import { ENERGY_SCALE, SENSORY_SCALE } from "@/lib/burnout-utils";
 
-const ENERGY_SCALE = [
-  { v: 1, label: "Depleted" },
-  { v: 2, label: "Low" },
-  { v: 3, label: "Steady" },
-  { v: 4, label: "Present" },
-  { v: 5, label: "Bright" },
-];
 
-const SENSORY_SCALE = [
-  { v: 1, label: "Quiet" },
-  { v: 2, label: "Soft" },
-  { v: 3, label: "Noticeable" },
-  { v: 4, label: "A lot" },
-  { v: 5, label: "Overloaded" },
-];
 
 // Map an average (may be fractional) to the nearest scale label,
 // so summaries speak in words rather than numbers.
