@@ -3,7 +3,9 @@
 //
 //   - The coach gets a short summary of today with each message
 //     (lib/coach-summary.ts), never check-in notes or compassion entries.
-//   - Nothing is saved. The conversation lives in this tab (lib/coach-data.ts).
+//   - Nothing is saved unless the person keeps it (Settings, then a switch on
+//     each conversation; lib/coach-history.ts). The conversation in progress
+//     lives in this tab (lib/coach-data.ts).
 //   - 40 messages a day in the beta, with a note from 30 on
 //     (lib/coach-allowance.ts). The crisis resources are never limited.
 
@@ -24,6 +26,8 @@ import { startOfLocalDay } from "@/lib/local-date";
 import { daySummary } from "@/lib/coach-summary";
 import { allowanceNote, canSend } from "@/lib/coach-allowance";
 import { askCoach, coachSentToday, conversation, useConversation, type CoachMessage } from "@/lib/coach-data";
+import { deleteConversations, keepNote, keeps, saveMessages } from "@/lib/coach-history";
+import { KeepSwitch, KeptConversations } from "@/components/kept-conversations";
 import { cn } from "@/lib/utils";
 
 export const OPENER = "What's on your mind about today?";
@@ -90,7 +94,8 @@ export default function Talk() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const qc = useQueryClient();
-  const messages = useConversation(userId);
+  const conv = useConversation(userId);
+  const messages = conv.messages;
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -112,6 +117,19 @@ export default function Talk() {
   const allowed = canSend(sentToday, continuing);
   const note = allowanceNote(sentToday, continuing);
   const waitingOnRetry = messages.length > 0 && messages[messages.length - 1].role === "user";
+  const setting = profileQ.data?.coach_keep;
+  const keepThis = keeps(setting) && (conv.keep ?? true);
+
+  /** Saves what isn't saved yet. A failure doesn't lose the reply; it says so. */
+  async function keepUpTo(history: CoachMessage[], from: { conversationId: number | null; savedCount: number }) {
+    try {
+      const id = await saveMessages({ conversationId: from.conversationId, messages: history, savedCount: from.savedCount });
+      conversation.set(userId, { conversationId: id, savedCount: history.length });
+      qc.invalidateQueries({ queryKey: ["coach-conversations"] });
+    } catch (e) {
+      setProblem(`The reply is here, but it couldn't be kept just now. ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -137,11 +155,14 @@ export default function Talk() {
       });
       qc.setQueryData(["coach-usage", today], answer.sentToday);
       if (answer.kind === "reply") {
-        conversation.set(userId, [...history, { role: "assistant", content: answer.reply }]);
+        const next: CoachMessage[] = [...history, { role: "assistant", content: answer.reply }];
+        const saved = { conversationId: conv.conversationId, savedCount: conv.savedCount };
+        conversation.set(userId, { messages: next });
+        if (keepThis) await keepUpTo(next, saved);
       } else {
         // Over the allowance: the message goes back in the box, unsent.
         const last = history[history.length - 1];
-        conversation.set(userId, history.slice(0, -1));
+        conversation.set(userId, { messages: history.slice(0, -1) });
         setDraft(last.content);
       }
     } catch (e) {
@@ -155,7 +176,7 @@ export default function Talk() {
     const text = draft.trim();
     if (!text || pending || !ready || !allowed || waitingOnRetry) return;
     const history: CoachMessage[] = [...messages, { role: "user", content: text }];
-    conversation.set(userId, history);
+    conversation.set(userId, { messages: history });
     setDraft("");
     void send(history);
   }
@@ -253,10 +274,38 @@ export default function Talk() {
             {note}
           </p>
         )}
-        <p className="text-xs text-muted-foreground">
-          This conversation isn't saved. It's gone when you close this tab or press Start over.
+        {keeps(setting) && (
+          <KeepSwitch
+            on={keepThis}
+            saved={conv.conversationId != null}
+            disabled={pending}
+            onKeep={async () => {
+              conversation.set(userId, { keep: true });
+              // Keep what's been said so far, up to the last reply.
+              const upTo = waitingOnRetry ? messages.slice(0, -1) : messages;
+              if (upTo.length > 0) await keepUpTo(upTo, { conversationId: conv.conversationId, savedCount: conv.savedCount });
+            }}
+            onStopKeeping={async () => {
+              if (conv.conversationId != null) await deleteConversations([conv.conversationId]);
+              conversation.set(userId, { keep: false, conversationId: null, savedCount: 0 });
+              qc.invalidateQueries({ queryKey: ["coach-conversations"] });
+            }}
+          />
+        )}
+        <p className="text-xs text-muted-foreground" data-testid="coach-keep-note">
+          {keepNote(setting, keepThis)}
         </p>
       </form>
+
+      {keeps(setting) && (
+        <KeptConversations
+          setting={setting!}
+          userId={userId}
+          openId={conv.conversationId}
+          unkeptOnScreen={messages.length > 0 && !keepThis}
+          onOpened={() => setProblem(null)}
+        />
+      )}
     </div>
   );
 }

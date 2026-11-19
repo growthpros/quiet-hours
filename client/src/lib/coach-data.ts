@@ -1,10 +1,11 @@
 // Talking to the coach ("Talk it through", part 1), and the one
 // conversation in progress.
 //
-// Nothing is saved in part 1. The conversation lives in this tab's memory:
-// it stays while the person moves around the app (so checking Tasks
-// mid-conversation doesn't lose it) and is gone when the tab closes, the
-// page reloads, they press "Start over", or someone else signs in.
+// The conversation in progress lives in this tab's memory: it stays while
+// the person moves around the app (so checking Tasks mid-conversation
+// doesn't lose it) and is gone when the tab closes, the page reloads, they
+// press "Start over", or someone else signs in. A kept conversation is also
+// saved as it goes (lib/coach-history.ts), so it can be opened again later.
 
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/lib/supabase";
@@ -45,9 +46,23 @@ export async function coachSentToday(day: string): Promise<number> {
 }
 
 // ---------- The conversation in progress (this tab only) ----------
+//
+// If the person keeps it (part 2, lib/coach-history.ts), it also has the id
+// of its saved copy and how many of its messages are saved so far. "keep"
+// is null until they flip the switch, meaning it follows their Settings
+// choice.
+
+export interface Conversation {
+  messages: CoachMessage[];
+  conversationId: number | null;
+  savedCount: number;
+  keep: boolean | null;
+}
+
+const EMPTY: Conversation = { messages: [], conversationId: null, savedCount: 0, keep: null };
 
 let owner: string | null = null;
-let messages: CoachMessage[] = [];
+let current: Conversation = EMPTY;
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -55,18 +70,19 @@ function emit() {
 }
 
 export const conversation = {
-  /** The messages for this person; empty if the tab's conversation was someone else's. */
-  get(userId: string | null): CoachMessage[] {
-    return owner === userId ? messages : EMPTY;
+  /** This person's conversation; empty if the tab's conversation was someone else's. */
+  get(userId: string | null): Conversation {
+    return owner === userId ? current : EMPTY;
   },
-  set(userId: string | null, next: CoachMessage[]) {
+  set(userId: string | null, next: Partial<Conversation>) {
+    const base = owner === userId ? current : EMPTY;
     owner = userId;
-    messages = next;
+    current = { ...base, ...next };
     emit();
   },
   clear() {
     owner = null;
-    messages = EMPTY;
+    current = EMPTY;
     emit();
   },
   subscribe(l: () => void) {
@@ -75,8 +91,6 @@ export const conversation = {
   },
 };
 
-const EMPTY: CoachMessage[] = [];
-
-export function useConversation(userId: string | null): CoachMessage[] {
+export function useConversation(userId: string | null): Conversation {
   return useSyncExternalStore(conversation.subscribe, () => conversation.get(userId));
 }
