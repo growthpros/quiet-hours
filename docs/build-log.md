@@ -69,6 +69,8 @@ Checked: tests, test database run, preview, live check.
 | 2026-11-03 | The AI features are set up on the test database too, so they can be tried on previews. Caroline added a separate Anthropic key to the test project (Nov 8); brain dump sorting and "Break this down" both work there. | Caroline |
 | 2026-11-09 | Order of the next work: test database email through Resend, then "things like this usually take you…", then tidy-ups. | Caroline |
 | 2026-11-09 | "Things like this" matches on words in the title (instant, free, nothing leaves the app), not AI. AI grouping can come later if words aren't good enough. | Caroline |
+| 2026-11-18 | Keeping conversations moves up to part 2 of Talk it through, ahead of Just one thing and suggested tasks. Beta testers get it only after counsel answers. | Caroline |
+| 2026-11-19 | Reframes and Good Enough checklists built with AI (spec v3 sections 14 and 15) join beta, right after Talk it through, as two small changes. | Caroline |
 | 2026-11-09 | "Talk it through" is built from the Calm Commander coaching doc: its ideas and prompts, rebuilt, none of its code. It goes in as four pull requests: the coach, Just one thing, suggested tasks, keeping conversations. Plan doc: "Talk it through: plan v1". | Caroline |
 | 2026-11-09 | Talk it through lives on its own page and opens from moments like a hard check-in, an overloaded day, or a task you keep moving. | Caroline |
 | 2026-11-09 | Beta allowance: 40 coach messages per person per day, a note from 30, reset at local midnight, counts only. A monthly spend limit on the Anthropic workspace (starting at $50) as a backstop. | Caroline |
@@ -798,6 +800,46 @@ Migration 019 (`coach_usage` and `coach_count_message`) applied to the test data
 - The page fit a phone (390 wide) and a computer (1280 wide), with no errors on the page.
 - The first summary said "9 committed, 7 free", and the coach read that as a shortfall. The line now says "Today's open tasks need 9 ... so 7 are left over after today's tasks."
 
+### 2026-11-19: Talk it through, keeping conversations (part 2 of 4) (#54)
+
+**What and why:**
+Coming back to a conversation is a big part of what makes the coach useful, so keeping conversations moved up to part 2 (Caroline's decision, Nov 18). It follows her Nov 9 decisions: each person chooses, "Don't keep" is the default, kept ones last 30 days, 90 days or until deleted, any one can be deleted, and a pinned one stays past its time.
+
+What changed:
+
+- **Settings, "Coach conversations":** Don't keep (the default), Keep for 30 days, Keep for 90 days, or Keep until I delete them. It says plainly that each message still goes to the AI for a reply, whichever they choose. A change that would delete conversations asks first and says how many: turning keeping off ("This deletes your 12 kept conversations, pinned ones too") or shortening the time ("This deletes 3 kept conversations older than 30 days. Pinned ones stay"). Then it deletes them straight away. **Delete all my conversations** is there too, with a confirm.
+- **On the Talk it through page,** when keeping is on:
+  - A **Keep this conversation** switch, starting from the Settings choice, so someone who usually keeps can have one private talk. Turning it off on a saved one asks first, then deletes what's saved; the conversation stays on screen.
+  - The line under the box says whether this one is kept and for how long.
+  - **Kept conversations:** a list by first line and date, with "goes in 25 days" or "pinned". Tap one to read it and carry on talking. Pin or unpin it, or delete it with a confirm. Opening one while an unkept conversation is on screen asks first, since that one will be gone.
+- **Saving:** a kept conversation is saved after each reply, only the new messages. If saving fails, the reply still shows, with a note that it couldn't be kept.
+- **How long is measured:** from the last message, so a conversation someone keeps coming back to doesn't vanish mid-use. The rule follows the current setting, so shortening 90 days to 30 applies to older ones too.
+- **The nightly clean-up** runs inside the database at 3:17 UTC every night, using the database's own scheduler (pg_cron). For each person it deletes unpinned conversations past their 30 or 90 days, and everything if keeping is off (a safety net; the app already deletes those). That way "30 days" stays true even if nobody opens the app.
+
+**Decisions:**
+Keeping conversations moves up to part 2 (Nov 18). Reframes and Good Enough checklists built with AI join beta right after Talk it through (Nov 19, added to the Beta Plan). See the table.
+
+**Database:**
+Migration 020 adds `user_profiles.coach_keep` (default off), `coach_conversations` and `coach_messages`, the `coach_cleanup` function and its nightly job. Both tables have row-level security: a person can read, add and delete only their own, and a message can only be added to their own conversation and never edited. Both are deleted with the account and included in Export. Only the database can run the clean-up. Applied to the test database on Nov 19; the security check showed only the three older items already in Open items. Production needs migration 020 before this merges, with Caroline's OK.
+
+**Checked:**
+`npm run verify` passes (252 tests). On the test database:
+
+- The clean-up, with the setting at 30 days and three conversations (5 days old, 45 days old, 45 days old and pinned), deleted only the 45-day unpinned one, with its message.
+- Acting as a different account: it saw none of the test user's conversations or messages, deleted none, and adding a message to one of them was refused.
+
+On the preview, as the test user, at phone width:
+
+- With keeping off: no switch, no list, "This conversation isn't saved."
+- Choosing 30 days in Settings saved it, and Talk it through said "Kept for 30 days after your last message."
+- Two replies saved one conversation with 4 messages, listed as "open now · goes in 30 days."
+- Start over, then opening it from the list showed all 4 messages, and carrying on saved 6, still one conversation.
+- Pinning saved; a private conversation (switch off) saved nothing.
+- Opening a kept one with an unkept one on screen asked first.
+- Turning the switch off on the saved one asked, deleted it, and left it on screen.
+- Turning keeping off in Settings said "This deletes your 1 kept conversation, pinned ones too" and deleted it.
+- No errors on the page, and nothing wider than the screen.
+
 ## Open items
 
 Things noticed along the way that aren't scheduled yet:
@@ -812,6 +854,8 @@ Things noticed along the way that aren't scheduled yet:
 - The spoon model is done (changes 1 to 4). Learning from history (suggesting a lower ordinary day after hard stretches) waits for 2 weeks of check-ins.
 - The Repeats page can show "Nothing repeats yet" for a repeat created outside the app until the page is reloaded. Seen only in testing; repeats made in the app show right away.
 - Not built yet from the spoon rules in spec v3: the 2nd-override heads-up, the link to the last crash in the pause, phases changing Foundation, the hours meter, and the two check-in safety rules. "Make it smaller" for moved tasks waits for subtasks.
-- Talk it through parts 2 to 4 (Just one thing, suggested tasks, keeping conversations), and opening the coach from a hard check-in, an overloaded day or a task you keep moving.
+- Talk it through parts 3 and 4 (Just one thing, suggested tasks), and opening the coach from a hard check-in, an overloaded day or a task you keep moving.
 - The coach still sometimes asks two questions in one reply and uses "just" in a soft way ("just look at it"). Worth watching in beta before changing the prompt again.
 - The monthly spend limit on the Anthropic workspace needs setting before beta testers use the coach.
+- Counsel's answers on kept conversations (health data, consent, retention wording) before beta testers are invited. Until then, keeping conversations is for Caroline's own account.
+- AI reframes and "Build one with me" Good Enough checklists, after Talk it through.
