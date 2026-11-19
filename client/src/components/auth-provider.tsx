@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { conversation } from "@/lib/coach-data";
 
 interface AuthState {
   session: Session | null;
@@ -164,6 +165,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, s) => {
+      // Signing out ends any coach conversation in this tab (nothing is saved).
+      if (!s) conversation.clear();
       if (!cancelled) setSession(s);
     });
 
@@ -191,6 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: error ?? null };
     },
     signOut: async () => {
+      conversation.clear();
       await supabase.auth.signOut();
     },
   };

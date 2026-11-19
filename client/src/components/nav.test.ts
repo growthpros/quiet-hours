@@ -9,9 +9,15 @@ const appSource = readFileSync(path.resolve(import.meta.dirname, "../App.tsx"), 
 const routes = [...appSource.matchAll(/<Route path="([^"]+)"/g)].map((m) => m[1]);
 
 describe("phone navigation", () => {
-  it("shows Today, Tasks, Calendar, Brain dump and Check-in on the bar", () => {
+  it("shows Today, Tasks, Calendar, Brain dump and Talk it through on the bar", () => {
     const titles = PHONE_BAR_URLS.map((u) => NAV_ITEMS.find((i) => i.url === u)?.title);
-    expect(titles).toEqual(["Today", "Tasks", "Calendar", "Brain dump", "Check-in"]);
+    expect(titles).toEqual(["Today", "Tasks", "Calendar", "Brain dump", "Talk it through"]);
+  });
+
+  it("puts Check-in under More, and labels Talk it through \"Talk\" on the bar", () => {
+    expect(moreItems().map((i) => i.url)).toContain("/burnout");
+    const talk = NAV_ITEMS.find((i) => i.url === "/talk");
+    expect(talk && "short" in talk ? talk.short : null).toBe("Talk");
   });
 
   it("reaches every page, on the bar or under More", () => {

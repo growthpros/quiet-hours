@@ -13,7 +13,7 @@ Quiet Hours is a neurodivergent-designed planner and burnout check-in app, built
 
 - **Frontend:** React 18, Vite, TypeScript (strict), Tailwind, shadcn/ui, wouter (hash routing), TanStack Query.
 - **Data and sign-in:** Supabase (Postgres, row-level security, magic-link auth). The browser talks to Supabase directly; there is no app server.
-- **AI features:** two Supabase Edge Functions in `supabase/functions/` (`parse-brain-dump`, `break-down-task`) that call the Anthropic API.
+- **AI features:** three Supabase Edge Functions in `supabase/functions/` (`parse-brain-dump`, `break-down-task`, and `coach` for Talk it through) that call the Anthropic API.
 - **Hosting:** Vercel, connected to this repo. `main` deploys to production. Every other branch gets a preview deployment.
 - **Email:** Resend, used by Supabase Auth for magic links.
 
@@ -44,7 +44,7 @@ The test project holds no real data. Use it freely. Production holds real users'
 
 **Database changes**
 
-- Every schema change is a new numbered file in `supabase/migrations/` (next is `019_...`). Never edit an applied migration.
+- Every schema change is a new numbered file in `supabase/migrations/` (next is `020_...`). Never edit an applied migration.
 - Apply it to the test project first and check it there.
 - Apply to production only after the pull request is approved, and only with Caroline's OK. If the app code depends on the change, apply it to production before merging.
 - Every new table that holds user data needs:

@@ -353,7 +353,7 @@ export async function deleteBrainDump(id: number): Promise<void> {
 // Coerce anything Supabase / Deno throws into a real Error with a readable
 // message. Supabase's error objects and FunctionsHttpError instances don't
 // stringify well ('[object Object]'), so we extract known fields.
-function toReadableError(e: unknown, fallback: string): Error {
+export function toReadableError(e: unknown, fallback: string): Error {
   if (e instanceof Error) return e;
   if (typeof e === "string") return new Error(e);
   if (e && typeof e === "object") {

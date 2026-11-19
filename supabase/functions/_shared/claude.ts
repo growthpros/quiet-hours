@@ -47,3 +47,37 @@ export function stripJsonFences(text: string): string {
   const m = trimmed.match(fenceRe);
   return m ? m[1].trim() : trimmed;
 }
+
+// A conversation: the whole back-and-forth goes each time, because the model
+// keeps no memory between requests. The first message must be the person's,
+// and the two sides take turns.
+export interface ChatMessage { role: "user" | "assistant"; content: string; }
+export interface ClaudeChatInput { system: string; messages: ChatMessage[]; maxTokens?: number; temperature?: number; }
+
+export async function callClaudeChat(input: ClaudeChatInput): Promise<string> {
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set in edge function secrets");
+  const body = { model: MODEL, max_tokens: input.maxTokens ?? 700, temperature: input.temperature ?? 0.5, system: input.system, messages: input.messages };
+  const maxAttempts = 3;
+  let lastErr = "";
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const resp = await fetch(ANTHROPIC_URL, {
+      method: "POST",
+      headers: { "x-api-key": apiKey, "content-type": "application/json", "anthropic-version": "2023-06-01" },
+      body: JSON.stringify(body),
+    });
+    if (resp.ok) {
+      const json = await resp.json();
+      const text = json?.content?.[0]?.text;
+      if (typeof text === "string") return text;
+      throw new ClaudeError(`Claude returned no text (stop_reason=${json?.stop_reason ?? "unknown"})`, json?.stop_reason ?? null);
+    }
+    // Only the status goes in the error, so nothing the person wrote is logged.
+    lastErr = `Anthropic ${resp.status}`;
+    await resp.body?.cancel();
+    const transient = resp.status === 429 || resp.status === 529 || (resp.status >= 500 && resp.status < 600);
+    if (!transient || attempt === maxAttempts) throw new Error(lastErr);
+    await sleep(500 * Math.pow(3, attempt - 1));
+  }
+  throw new Error(lastErr || "Claude call failed after retries");
+}

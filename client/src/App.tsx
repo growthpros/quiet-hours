@@ -33,6 +33,7 @@ import Compassion from "@/pages/compassion";
 import Burnout from "@/pages/burnout";
 import History from "@/pages/history";
 import Settings from "@/pages/settings";
+import Talk from "@/pages/talk";
 
 function AppRouter() {
   return (
@@ -44,6 +45,7 @@ function AppRouter() {
       <Route path="/calendar" component={Calendar} />
       <Route path="/recurring" component={Recurring} />
       <Route path="/brain-dump" component={BrainDump} />
+      <Route path="/talk" component={Talk} />
       <Route path="/delegation" component={Delegation} />
       <Route path="/good-enough" component={GoodEnough} />
       <Route path="/reframes" component={Reframes} />
