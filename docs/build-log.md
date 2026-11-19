@@ -784,7 +784,7 @@ What changed:
 Talk it through's place on the phone's bottom bar, the "Talk" label, and the coach's plan decisions from Nov 9 (see the table).
 
 **Database:**
-Migration 019 (`coach_usage` and `coach_count_message`) applied to the test database on Nov 9 with Caroline's OK. The security check showed only the three older items already in Open items. Production needs migration 019 and the `coach` function deployed before this merges, with Caroline's OK.
+Migration 019 (`coach_usage` and `coach_count_message`) applied to the test database on Nov 9 with Caroline's OK. The security check showed only the three older items already in Open items. Applied to the live database on Nov 19 with Caroline's OK, and the `coach` function deployed to the live project, before merging. The live table checked out the same as the test one (row-level security on, only the server can count, removed with the account).
 
 **Checked:**
 `npm run verify` passes (238 tests). On the preview against the test database, as the test user with a seeded day (four tasks on today, one this week, a Frozen check-in):
