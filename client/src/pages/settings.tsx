@@ -25,6 +25,7 @@ import { CheckInCadenceCard } from "@/components/checkin-cadence-card";
 import { WeekStartCard } from "@/components/week-start-card";
 import { OrdinaryDayCard } from "@/components/ordinary-day-card";
 import { SubtasksCard } from "@/components/subtasks-card";
+import { CoachKeepCard } from "@/components/coach-keep-card";
 import { queryClient } from "@/lib/queryClient";
 import { Download, LogOut, Trash2 } from "lucide-react";
 import { localIsoDate } from "@/lib/local-date";
@@ -112,6 +113,8 @@ export default function Settings() {
       <WeekStartCard />
 
       <SubtasksCard />
+
+      <CoachKeepCard />
 
       <Card>
         <CardHeader className="pb-2">

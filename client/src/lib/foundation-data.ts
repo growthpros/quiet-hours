@@ -80,6 +80,8 @@ export interface UserProfileRow {
   usual_budget: number | null;
   // Whether steps offer "Add a subtask" (migration 018). Off by default.
   show_subtasks: boolean;
+  /** Keeping coach conversations (migration 020): off, 30 or 90 days, or until deleted. */
+  coach_keep: "off" | "30" | "90" | "forever";
   created_at: number;
   updated_at: number;
 }
@@ -135,6 +137,7 @@ export async function updateProfile(
       | "week_starts_on"
       | "usual_budget"
       | "show_subtasks"
+      | "coach_keep"
     >
   >,
 ): Promise<UserProfileRow> {
