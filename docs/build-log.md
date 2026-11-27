@@ -820,7 +820,7 @@ What changed:
 Keeping conversations moves up to part 2 (Nov 18). Reframes and Good Enough checklists built with AI join beta right after Talk it through (Nov 19, added to the Beta Plan). See the table.
 
 **Database:**
-Migration 020 adds `user_profiles.coach_keep` (default off), `coach_conversations` and `coach_messages`, the `coach_cleanup` function and its nightly job. Both tables have row-level security: a person can read, add and delete only their own, and a message can only be added to their own conversation and never edited. Both are deleted with the account and included in Export. Only the database can run the clean-up. Applied to the test database on Nov 19; the security check showed only the three older items already in Open items. Production needs migration 020 before this merges, with Caroline's OK.
+Migration 020 adds `user_profiles.coach_keep` (default off), `coach_conversations` and `coach_messages`, the `coach_cleanup` function and its nightly job. Both tables have row-level security: a person can read, add and delete only their own, and a message can only be added to their own conversation and never edited. Both are deleted with the account and included in Export. Only the database can run the clean-up. Applied to the test database on Nov 19; the security check showed only the three older items already in Open items. Applied to the live database on Nov 27 with Caroline's OK, before merging. It checked out the same as the test one: row-level security on both tables, only the database can run the clean-up, the nightly job scheduled, keeping off for everyone, and no new items in the security check.
 
 **Checked:**
 `npm run verify` passes (252 tests). On the test database:
